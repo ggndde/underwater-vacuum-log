@@ -1,0 +1,203 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Employee {
+  id        Int    @id @default(autoincrement())
+  name      String @unique
+  hashedPin String
+}
+
+model Customer {
+  id        Int       @id @default(autoincrement())
+  name      String
+  address   String?
+  contacts  String? // JSON string for multiple contacts: [{ name, role, phone }]
+  remarks   String? // Special notes like "Myrtha Pool System"
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  machines  Machine[]
+  quotes    Quote[]
+  expenses  Expense[]
+}
+
+model Machine {
+  id           Int       @id @default(autoincrement())
+  modelName    String
+  serialNumber String
+  purchaseDate DateTime?
+
+  // Product Info (for quote numbering)
+  productType String @default("CP") // "CP" | "PP" | "N3" | "OS"
+  unitNo      Int    @default(1) // 1호기, 2호기 ...
+
+  // Pool Specs
+  poolSize  String? // "25M x 13.5M(6 lanes)"
+  obstacles String? // "Handicap ramp, 2 ladders"
+  floorType String? // "1. M x M 2. 3."
+
+  customerId Int
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  logs       ServiceLog[]
+  quotes     Quote[]
+}
+
+model ServiceLog {
+  id   Int      @id @default(autoincrement())
+  date DateTime @default(now())
+
+  type       String // "VISIT", "CALL", "DELIVERY", "ETC"
+  visitType  String  @default("유상") // "유상" | "무상"
+  technician String?
+  body       String? // Main content/description
+
+  // Structured Field Data
+  hours      Float?
+  cycles     Int?
+  errorCodes String? // e.g. "101: 1, 3, 6"
+
+  // Actions
+  actionType String? // "Parts Replacement", "Cleaning", etc.
+
+  // Fixed Settings Columns (from PDF "전, 후, 폭, P")
+  settingFront String? // 전
+  settingRear  String? // 후
+  settingWidth String? // 폭
+  settingP     String? // P
+
+  // Detailed Settings Changes (JSON string)
+  // e.g. [{"param": "MAX. CLEAN. TIME", "old": "3hr", "new": "1hr"}]
+  settingsChanges String?
+
+  // Homework tracking
+  photosConfirmed Boolean @default(false) // 사내 공유폴더 사진 첨부 확인
+
+  machineId Int
+  machine   Machine @relation(fields: [machineId], references: [id])
+
+  quote      Quote?
+  expense    Expense?
+  // Naver Works Integration
+  externalId String?  @unique // 네이버웍스 연동용 식별자
+  source     String   @default("web") // "web" | "naver_works"
+
+  createdAt DateTime @default(now())
+}
+
+model Quote {
+  id           Int        @id @default(autoincrement())
+  // 생성 규칙: {고객명}-{N}호기({제품})-{YYMMDD}_{당일순번}
+  // 예: "가나수영장-1호기(CP)-260309_1"
+  quoteNo      String     @unique
+  serviceLogId Int        @unique
+  serviceLog   ServiceLog @relation(fields: [serviceLogId], references: [id])
+  customerId   Int
+  customer     Customer   @relation(fields: [customerId], references: [id])
+  machineId    Int
+  machine      Machine    @relation(fields: [machineId], references: [id])
+  items        String // JSON: [{name, qty, unitPrice, amount}]
+  totalAmount  Int        @default(0)
+  taxAmount    Int        @default(0)
+  grandTotal   Int        @default(0)
+  memo         String?
+  createdBy    String     @default("")
+  createdAt    DateTime   @default(now())
+}
+
+model Expense {
+  id           Int        @id @default(autoincrement())
+  serviceLogId Int        @unique
+  serviceLog   ServiceLog @relation(fields: [serviceLogId], references: [id])
+  customerId   Int
+  customer     Customer   @relation(fields: [customerId], references: [id])
+  quoteId      Int? // 연결된 견적서 (있는 경우)
+  amount       Int        @default(0) // 청구금액
+  paymentType  String     @default("세금계산서") // "세금계산서" | "현장카드결제" | "무통장" | "무상"
+  status       String     @default("미수") // "미수" | "청구" | "완납"
+  paidDate     DateTime?
+  memo         String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Part {
+  id                Int                @id @default(autoincrement())
+  articleNo         String             @unique
+  name              String
+  category          String             @default("공용") // "CP" | "PP" | "NV3" | "공용"
+  stock             Int                @default(0)
+  lowStockThreshold Int                @default(2)
+  transactions      StockTransaction[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model StockTransaction {
+  id              Int      @id @default(autoincrement())
+  partId          Int
+  part            Part     @relation(fields: [partId], references: [id])
+  delta           Int // 양수=입고, 음수=출고
+  transactionType String // "입고" | "현장사용" | "택배발송" | "기타"
+  note            String? // 업체명 or 메모
+  performedBy     String   @default("") // 담당 직원
+  createdAt       DateTime @default(now())
+}
+
+model WorkChecklist {
+  id          Int    @id @default(autoincrement())
+  companyName String // 업체명
+
+  // 택배 관련
+  hasDelivery     Boolean  @default(false)
+  deliveryCarrier String?  // 발송 업체 (CJ대한통운, 한진, 로젠 등)
+  deliveryItems   String?  // 발송 품목 (자유 텍스트)
+  usedParts       String?  // 연동된 부품 이력 (JSON 배열)
+  deliverySent    Boolean? // 발송 완료 여부
+
+  // CRM 체크리스트
+  hasCrmUpdate     Boolean  @default(false)
+  crmType          String   @default("AS") // "AS" | "NEW"
+  crmUpdated       Boolean? // 고객관리 업데이트
+  poolInfoUpdated  Boolean? // 풀장 정보 업데이트 (신규납품 전용)
+  quoteSent        Boolean? // 견적서 발송
+  photosAttached   Boolean? // 사진 첨부
+  paymentUpdated   Boolean? // 결재현황 업데이트
+  naverWorksLogged Boolean? // 네이버 웍스 기록
+
+  completed Boolean  @default(false) // 모든 스텝 완료 여부
+  createdBy String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Delivery {
+  id          Int      @id @default(autoincrement())
+  date        DateTime // 납품 날짜
+  productName String // 제품명
+  destination String // 납품처
+  quantity    Int      @default(1) // 수량
+  memo        String? // 메모
+  performedBy String   @default("") // 담당자
+  status      String   @default("예정") // "예정" | "완료" | "취소"
+
+  // Naver Works Integration
+  externalId String?  @unique // 네이버웍스 캘린더 연동용 식별자
+  source     String   @default("web") // "web" | "naver_works"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model NaverWorksMeta {
+  postId       String   @id
+  commentCount Int      @default(0)
+  updatedAt    DateTime @updatedAt
+}
