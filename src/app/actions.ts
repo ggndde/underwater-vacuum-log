@@ -1,6 +1,6 @@
-﻿import { prisma } from '@/lib/prisma'
-'use server'
+﻿'use server'
 
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
@@ -9,6 +9,9 @@ import bcrypt from 'bcryptjs'
 
 
 export async function createServiceLog(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const customerId = parseInt(formData.get('customerId') as string)
     const machineId = formData.get('machineId') ? parseInt(formData.get('machineId') as string) : null
 
@@ -131,6 +134,9 @@ export async function skipQuote(formData: FormData) {
 }
 
 export async function confirmPhotos(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const serviceLogId = parseInt(formData.get('serviceLogId') as string)
     const customerId = parseInt(formData.get('customerId') as string)
     const confirmed = formData.get('photosConfirmed') === 'true'
@@ -145,6 +151,9 @@ export async function confirmPhotos(formData: FormData) {
 }
 
 export async function skipPhotos(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const customerId = parseInt(formData.get('customerId') as string)
     const serviceLogId = parseInt(formData.get('serviceLogId') as string)
     revalidatePath(`/clients/${customerId}`)
@@ -152,6 +161,9 @@ export async function skipPhotos(formData: FormData) {
 }
 
 export async function createExpense(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const serviceLogId = parseInt(formData.get('serviceLogId') as string)
     const customerId = parseInt(formData.get('customerId') as string)
     const quoteId = formData.get('quoteId') ? parseInt(formData.get('quoteId') as string) : null
@@ -183,6 +195,9 @@ export async function createExpense(formData: FormData) {
 }
 
 export async function updateExpenseStatus(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const expenseId = parseInt(formData.get('expenseId') as string)
     const status = formData.get('status') as string
     const customerId = parseInt(formData.get('customerId') as string)
@@ -201,6 +216,9 @@ export async function updateExpenseStatus(formData: FormData) {
 // ─── Machine CRUD Actions ───────────────────────────────────────────────────
 
 export async function upsertMachine(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const customerId = parseInt(formData.get('customerId') as string)
     const machineIdStr = formData.get('machineId') as string
     const machineId = machineIdStr ? parseInt(machineIdStr) : null
@@ -230,6 +248,9 @@ export async function upsertMachine(formData: FormData) {
 }
 
 export async function deleteMachine(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const machineId = parseInt(formData.get('machineId') as string)
     const customerId = parseInt(formData.get('customerId') as string)
 
@@ -243,6 +264,9 @@ export async function deleteMachine(formData: FormData) {
 // ─── Parts Inventory Actions ───────────────────────────────────────────────
 
 export async function addPart(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const articleNo = formData.get('articleNo') as string
     const name = formData.get('name') as string
     const category = formData.get('category') as string || '공용'
@@ -256,6 +280,9 @@ export async function addPart(formData: FormData) {
 }
 
 export async function updatePart(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const partId = parseInt(formData.get('partId') as string)
     const articleNo = formData.get('articleNo') as string
     const name = formData.get('name') as string
@@ -380,6 +407,9 @@ export async function changePIN(formData: FormData) {
 }
 
 export async function deletePart(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const partId = parseInt(formData.get('partId') as string)
     await prisma.stockTransaction.deleteMany({ where: { partId } })
     await prisma.part.delete({ where: { id: partId } })
@@ -415,6 +445,9 @@ export async function createDelivery(formData: FormData) {
 }
 
 export async function updateDelivery(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const id = parseInt(formData.get('id') as string)
     const dateStr = formData.get('date') as string
     const productName = formData.get('productName') as string
@@ -441,6 +474,9 @@ export async function updateDelivery(formData: FormData) {
 }
 
 export async function deleteDelivery(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const id = parseInt(formData.get('id') as string)
     await prisma.delivery.delete({ where: { id } })
     revalidatePath('/delivery')
@@ -470,6 +506,9 @@ export async function createWorkChecklist(formData: FormData) {
 }
 
 export async function updateWorkChecklist(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const id = parseInt(formData.get('id') as string)
 
     const data: Record<string, unknown> = {}
@@ -665,8 +704,11 @@ export async function deleteWorkChecklist(formData: FormData) {
 }
 
 export async function moveToTodayWorkChecklist(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const id = parseInt(formData.get('id') as string)
-    await (prisma as any).workChecklist.update({ 
+    await (prisma as any).workChecklist.update({
         where: { id },
         data: { createdAt: new Date() }
     })
