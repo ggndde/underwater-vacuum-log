@@ -74,6 +74,8 @@ export async function createServiceLog(formData: FormData) {
 
 export async function createQuote(formData: FormData) {
     const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const serviceLogId = parseInt(formData.get('serviceLogId') as string)
     const customerId = parseInt(formData.get('customerId') as string)
     const machineId = parseInt(formData.get('machineId') as string)
@@ -127,6 +129,9 @@ export async function createQuote(formData: FormData) {
 }
 
 export async function skipQuote(formData: FormData) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const customerId = parseInt(formData.get('customerId') as string)
     const serviceLogId = parseInt(formData.get('serviceLogId') as string)
     revalidatePath(`/clients/${customerId}`)
@@ -420,7 +425,9 @@ export async function deletePart(formData: FormData) {
 
 export async function createDelivery(formData: FormData) {
     const session = await getServerSession(authOptions)
-    const performedBy = (formData.get('performedBy') as string) || session?.user?.name || ''
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
+    const performedBy = (formData.get('performedBy') as string) || session.user.name
 
     const dateStr = formData.get('date') as string
     const productName = formData.get('productName') as string
@@ -486,6 +493,8 @@ export async function deleteDelivery(formData: FormData) {
 
 export async function createWorkChecklist(formData: FormData) {
     const session = await getServerSession(authOptions)
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
     const companyName = formData.get('companyName') as string
     const hasDelivery = formData.get('hasDelivery') === 'true'
     const hasCrmUpdate = formData.get('hasCrmUpdate') === 'true'
@@ -534,7 +543,9 @@ export async function updateWorkChecklist(formData: FormData) {
 
 export async function addChecklistPart(checklistId: number, partId: number, qty: number, transactionType: string) {
     const session = await getServerSession(authOptions)
-    const performedBy = session?.user?.name ?? ''
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
+    const performedBy = session.user.name
 
     const checklist = await prisma.workChecklist.findUnique({ where: { id: checklistId } })
     if (!checklist) throw new Error('업무체크 항목을 찾을 수 없습니다.')
@@ -576,7 +587,9 @@ export async function addChecklistPart(checklistId: number, partId: number, qty:
 
 export async function batchAddChecklistPart(checklistId: number, parts: { partId: number, qty: number }[], transactionType: string) {
     const session = await getServerSession(authOptions)
-    const performedBy = session?.user?.name ?? ''
+    if (!session?.user?.name) return { success: false, error: '로그인이 필요합니다.' }
+
+    const performedBy = session.user.name
 
     try {
         const checklist = await prisma.workChecklist.findUnique({ where: { id: checklistId } })
@@ -635,7 +648,9 @@ export async function batchAddChecklistPart(checklistId: number, parts: { partId
 
 export async function removeChecklistPart(checklistId: number, partId: number) {
     const session = await getServerSession(authOptions)
-    const performedBy = session?.user?.name ?? ''
+    if (!session?.user?.name) return { success: false, error: '로그인이 필요합니다.' }
+
+    const performedBy = session.user.name
 
     try {
         const checklist = await prisma.workChecklist.findUnique({ where: { id: checklistId } })
@@ -676,7 +691,9 @@ export async function removeChecklistPart(checklistId: number, partId: number) {
 
 export async function deleteWorkChecklist(formData: FormData) {
     const session = await getServerSession(authOptions)
-    const performedBy = session?.user?.name ?? ''
+    if (!session?.user?.name) throw new Error('로그인이 필요합니다.')
+
+    const performedBy = session.user.name
     const id = parseInt(formData.get('id') as string)
     
     // Auto-refund parts if any exist before deleting
