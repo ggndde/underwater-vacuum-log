@@ -1,13 +1,15 @@
+﻿import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+;
 import { fetchBoards, fetchPosts, fetchComments } from '@/lib/naverWorks';
 import { parseComment } from '@/lib/parseNaverWorks';
-
-const prisma = new PrismaClient();
+;
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return new NextResponse('Unauthorized', { status: 401 })
+  }`) {
     // Enable this check in production with a strong CRON_SECRET
     // return new NextResponse('Unauthorized', { status: 401 });
   }
