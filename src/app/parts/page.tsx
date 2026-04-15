@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { PrismaClient } from '@prisma/client'
 import { addPart } from '@/app/actions'
 import { PartsClient } from './PartsClient'
+import { PdfImportButton } from './PdfImportButton'
 import { Package } from 'lucide-react'
 
 const prisma = new PrismaClient()
@@ -25,6 +26,7 @@ export default async function PartsPage() {
                         </h1>
                         <p className="text-sm text-slate-500 mt-1">총 {parts.length}종 부품 관리 중</p>
                     </div>
+                    <PdfImportButton />
                 </div>
             </header>
 
