@@ -26,7 +26,21 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+.env
+.env.*
 .env*.local
+
+# sensitive scripts with hardcoded credentials
+set_env.js
+set_env2.js
+set_env_naverworks.js
+set-env.js
+fix-vercel-env.js
+
+# database files - contain real data
+prisma/*.db
+prisma/*.db-journal
+db_dump.json
 
 # vercel
 .vercel

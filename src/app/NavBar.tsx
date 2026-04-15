@@ -140,6 +140,9 @@ export function NavBar({ userName }: { userName: string }) {
                             <Link href="/parts" className={`text-sm font-medium transition-colors ${isPath('/parts') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
                                 <span className="mr-1">📦</span><span className="inline">부품 재고</span>
                             </Link>
+                            <Link href="/diagrams" className={`text-sm font-medium transition-colors ${isPath('/diagrams') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
+                                <span className="mr-1">📐</span><span className="inline">부품 도면</span>
+                            </Link>
                             <Link href="/checklist" className={`text-sm font-medium transition-colors ${isPath('/checklist') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
                                 <span className="mr-1">✅</span><span className="inline">업무체크</span>
                             </Link>
@@ -201,6 +204,10 @@ export function NavBar({ userName }: { userName: string }) {
                     <Link href="/parts" className={`flex flex-col items-center justify-center w-full h-full transition-colors ${isPath('/parts') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
                         <span className={`text-[20px] mb-[2px] ${isPath('/parts') ? '' : 'opacity-80 grayscale-[20%]'}`}>📦</span>
                         <span className="text-[10px] font-bold">부품재고</span>
+                    </Link>
+                    <Link href="/diagrams" className={`flex flex-col items-center justify-center w-full h-full transition-colors ${isPath('/diagrams') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
+                        <span className={`text-[20px] mb-[2px] ${isPath('/diagrams') ? '' : 'opacity-80 grayscale-[20%]'}`}>📐</span>
+                        <span className="text-[10px] font-bold">도면</span>
                     </Link>
                     <Link href="/checklist" className={`flex flex-col items-center justify-center w-full h-full transition-colors ${isPath('/checklist') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
                         <span className={`text-[20px] mb-[2px] ${isPath('/checklist') ? '' : 'opacity-80 grayscale-[20%]'}`}>✅</span>

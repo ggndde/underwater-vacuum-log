@@ -8,10 +8,7 @@ import { parseComment } from '@/lib/parseNaverWorks';
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new NextResponse('Unauthorized', { status: 401 })
-  }`) {
-    // Enable this check in production with a strong CRON_SECRET
-    // return new NextResponse('Unauthorized', { status: 401 });
+    return new NextResponse('Unauthorized', { status: 401 });
   }
 
   try {

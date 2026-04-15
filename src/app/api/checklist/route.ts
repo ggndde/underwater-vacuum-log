@@ -62,6 +62,9 @@ const CRM_KEYS = ['crmUpdated', 'quoteSent', 'photosAttached', 'paymentUpdated',
 const isHandled = (v: boolean | null | undefined | unknown) => v === true || v === false
 
 export async function PATCH(req: NextRequest) {
+    const patchSession = await getServerSession(authOptions)
+    if (!patchSession?.user?.name) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+
     const fd = await req.formData()
     const id = parseInt(fd.get('id') as string)
 
@@ -107,6 +110,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    const deleteSession = await getServerSession(authOptions)
+    if (!deleteSession?.user?.name) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+
     const fd = await req.formData()
     const id = parseInt(fd.get('id') as string)
     await (prisma as any).workChecklist.delete({ where: { id } })

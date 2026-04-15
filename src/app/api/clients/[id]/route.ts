@@ -1,10 +1,17 @@
 export const dynamic = 'force-dynamic';
 import { PrismaClient } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 const prisma = new PrismaClient()
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) {
+        return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+    }
+
     const id = parseInt(params.id)
     if (isNaN(id)) {
         return NextResponse.json({ error: '잘못된 ID입니다.' }, { status: 400 })
