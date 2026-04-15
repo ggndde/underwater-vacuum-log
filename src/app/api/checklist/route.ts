@@ -1,11 +1,10 @@
+﻿import { prisma } from '@/lib/prisma'
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 
-const prisma = new PrismaClient()
 
 export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)

@@ -1,10 +1,13 @@
+﻿import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 export const dynamic = 'force-dynamic';
-import { PrismaClient } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 
-const prisma = new PrismaClient()
 
 export async function POST(req: NextRequest) {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.name) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
     try {
         const body = await req.json()
         const { name, address, contacts, remarks } = body
