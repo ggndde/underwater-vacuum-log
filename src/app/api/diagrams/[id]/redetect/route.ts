@@ -6,24 +6,34 @@ import OpenAI from 'openai'
 
 export const dynamic = 'force-dynamic'
 
-const DETECT_PROMPT = `You are analyzing a technical parts diagram (exploded view drawing).
-Find every Article Number visible in this image. Article numbers are typically 5-6 digit numbers.
-For each one, estimate its center position as a percentage of the total image width (x) and height (y), measured from the top-left corner.
-Also capture any part description text written near that number (e.g. "DRIVE MOTOR COMPL", "PUMP CPL").
+const DETECT_PROMPT = `You are analyzing a technical parts diagram (exploded view drawing) from a pool cleaning equipment manufacturer.
+
+Your task: find every Article Number (part number) in this image.
+
+IMPORTANT: Text in these diagrams is often rotated 90 degrees sideways (especially along the left or right edge). You MUST read rotated text carefully.
+
+Article numbers in this type of diagram are typically:
+- 5 to 7 digit numbers (e.g. 122011, 118601, 122260, 124448)
+- Sometimes prefixed with nothing, sometimes near arrows pointing to parts
+- Often listed in a column on the left side of the image, rotated 90° counterclockwise
+- Each number is associated with a part in the exploded view
+
+For each article number found, estimate its center position as a percentage of the total image width (x) and height (y), measured from the top-left corner (before any rotation).
 
 Return ONLY valid JSON in this exact format:
 {
   "hotspots": [
-    { "articleNo": "123456", "x": 23.5, "y": 45.2, "label": "DRIVE MOTOR COMPL" }
+    { "articleNo": "122011", "x": 23.5, "y": 45.2, "label": "DRIVE MOTOR COMPL" }
   ]
 }
 
 Rules:
-- Include every distinct article number you can see
-- If the same number appears multiple times (e.g. screws), list each occurrence separately
-- x and y must be between 0 and 100
-- label can be empty string "" if no description is nearby
-- Do not include drawing titles, company names, or non-article text`
+- Read ALL rotated/sideways numbers carefully — this is critical
+- Include every part number you can find, even if you are not 100% certain
+- x and y are coordinates in the ORIGINAL image orientation (top-left = 0,0)
+- label = nearby part description text, or "" if none
+- Do NOT include drawing numbers, revision codes, dates, or company names
+- Numbers like "10000676" (drawing number in title block) should be excluded`
 
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
@@ -62,7 +72,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
             Array.isArray(parsed.hotspots) ? parsed.hotspots : []
 
         hotspots = raw
-            .filter(h => typeof h.articleNo === 'string' && h.articleNo.match(/^\d{4,8}$/))
+            .filter(h => typeof h.articleNo === 'string' && h.articleNo.match(/^\d{4,10}$/))
             .map(h => ({
                 articleNo: String(h.articleNo).trim(),
                 x: Math.min(100, Math.max(0, Number(h.x) || 0)),
