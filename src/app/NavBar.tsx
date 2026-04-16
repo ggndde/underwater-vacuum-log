@@ -113,17 +113,17 @@ export function NavBar({ userName }: { userName: string }) {
     return (
         <>
             <nav className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white px-4 py-2.5 shadow-md sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800">
-                <div className="max-w-4xl mx-auto flex justify-between items-center">
-                    <Link href="/" className="font-bold text-lg sm:text-xl text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-slate-300 transition-colors tracking-tight">
+                <div className="max-w-6xl mx-auto flex justify-between items-center">
+                    <Link href="/" className="font-bold text-lg sm:text-xl text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-slate-300 transition-colors tracking-tight shrink-0">
                         <span className="sm:hidden">Rosin</span>
                         <span className="hidden sm:inline">Rosin Systech CO., LTD</span>
                     </Link>
-                    
-                    <div className="flex items-center">
+
+                    <div className="flex items-center min-w-0">
                         {/* Desktop Menu */}
-                        <div className="hidden sm:flex items-center gap-5">
-                            <Link href="/bids" className={`relative text-sm font-medium transition-colors ${isPath('/bids') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
-                                <span className="mr-1">📋</span><span className="inline">입찰공고</span>
+                        <div className="hidden sm:flex items-center gap-3 lg:gap-4">
+                            <Link href="/bids" className={`relative text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${isPath('/bids') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
+                                <span className="mr-0.5">📋</span><span className="inline">입찰공고</span>
                                 {hasNewBids && (
                                     <span className="absolute -top-1 -right-2 flex h-2 w-2">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -131,25 +131,25 @@ export function NavBar({ userName }: { userName: string }) {
                                     </span>
                                 )}
                             </Link>
-                            <Link href="/pools" className={`text-sm font-medium transition-colors ${isPath('/pools') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
-                                <span className="mr-1">🏗️</span><span className="inline">준공예정</span>
+                            <Link href="/pools" className={`text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${isPath('/pools') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
+                                <span className="mr-0.5">🏗️</span><span className="inline">준공예정</span>
                             </Link>
-                            <Link href="/delivery" className={`text-sm font-medium transition-colors ${isPath('/delivery') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
-                                <span className="mr-1">🚚</span><span className="inline">납품 캘린더</span>
+                            <Link href="/delivery" className={`text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${isPath('/delivery') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
+                                <span className="mr-0.5">🚚</span><span className="inline">납품 캘린더</span>
                             </Link>
-                            <Link href="/parts" className={`text-sm font-medium transition-colors ${isPath('/parts') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
-                                <span className="mr-1">📦</span><span className="inline">부품 재고</span>
+                            <Link href="/parts" className={`text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${isPath('/parts') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
+                                <span className="mr-0.5">📦</span><span className="inline">부품 재고</span>
                             </Link>
-                            <Link href="/diagrams" className={`text-sm font-medium transition-colors ${isPath('/diagrams') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
-                                <span className="mr-1">📐</span><span className="inline">부품 도면</span>
+                            <Link href="/diagrams" className={`text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${isPath('/diagrams') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
+                                <span className="mr-0.5">📐</span><span className="inline">부품 도면</span>
                             </Link>
-                            <Link href="/checklist" className={`text-sm font-medium transition-colors ${isPath('/checklist') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
-                                <span className="mr-1">✅</span><span className="inline">업무체크</span>
+                            <Link href="/checklist" className={`text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${isPath('/checklist') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
+                                <span className="mr-0.5">✅</span><span className="inline">업무체크</span>
                             </Link>
                         </div>
 
                         {/* Top-Right Action Menu (always visible) */}
-                        <div className="flex items-center gap-2.5 sm:gap-3 ml-0 sm:ml-5 pl-0 sm:pl-5 sm:border-l border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center gap-2 sm:gap-2.5 ml-0 sm:ml-3 pl-0 sm:pl-3 sm:border-l border-slate-200 dark:border-slate-700">
                             <User className="w-4 h-4 text-slate-500 dark:text-slate-400 hidden sm:block" />
                             <span className="text-sm font-semibold text-slate-700 dark:text-white hidden sm:inline">{userName}</span>
                             {mounted && (
