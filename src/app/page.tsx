@@ -1,9 +1,7 @@
 export const dynamic = 'force-dynamic';
 import Link from 'next/link'
-import { PrismaClient } from '@prisma/client'
-import { Package, FileSearch, Truck, CheckSquare, Building2 } from 'lucide-react'
-
-const prisma = new PrismaClient()
+import { prisma } from '@/lib/prisma'
+import { Package, FileSearch, Truck, CheckSquare, Building2, BookImage } from 'lucide-react'
 
 export default async function Home() {
     const partCount = await prisma.part.count()
@@ -33,6 +31,14 @@ export default async function Home() {
         incompleteChecklistCount = await (prisma as any).workChecklist.count({
             where: { createdAt: { gte: todayStart, lt: todayEnd }, completed: false }
         })
+    } catch {
+        // fallback
+    }
+
+    // 도면 수
+    let diagramCount = 0
+    try {
+        diagramCount = await (prisma as any).diagramSheet.count()
     } catch {
         // fallback
     }
@@ -78,6 +84,14 @@ export default async function Home() {
             color: incompleteChecklistCount > 0 ? 'from-amber-500 to-amber-700' : 'from-slate-600 to-slate-800',
             glow: incompleteChecklistCount > 0 ? 'shadow-amber-900/40' : 'shadow-slate-900/40',
         },
+        {
+            href: '/diagrams',
+            icon: BookImage,
+            label: '부품 도면',
+            sub: diagramCount > 0 ? `도면 ${diagramCount}장 등록됨` : '인터랙티브 도면 뷰어',
+            color: 'from-cyan-600 to-cyan-800',
+            glow: 'shadow-cyan-900/40',
+        },
     ]
 
     return (
@@ -95,7 +109,7 @@ export default async function Home() {
             </div>
 
             {/* Tiles */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5 w-full max-w-5xl">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5 w-full max-w-6xl">
                 {tiles.map(({ href, icon: Icon, label, sub, color, glow }) => (
                     <Link
                         key={href}

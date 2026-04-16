@@ -1,11 +1,9 @@
 export const dynamic = 'force-dynamic';
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { addPart } from '@/app/actions'
 import { PartsClient } from './PartsClient'
 import { PdfImportButton } from './PdfImportButton'
 import { Package } from 'lucide-react'
-
-const prisma = new PrismaClient()
 
 const CATEGORIES = ['CP', 'PP', 'NV3', '공용'] as const
 

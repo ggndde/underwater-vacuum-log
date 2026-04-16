@@ -1,9 +1,7 @@
 export const dynamic = 'force-dynamic';
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { DeliveryCalendar } from './DeliveryCalendar'
 import { Truck } from 'lucide-react'
-
-const prisma = new PrismaClient()
 
 export default async function DeliveryPage() {
     // Fetch employee names for autocomplete

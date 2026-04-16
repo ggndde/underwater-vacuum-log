@@ -3,9 +3,7 @@ import { notFound } from 'next/navigation';
 import LogForm from './LogForm';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 export default async function NewLogPage({ params }: { params: { id: string } }) {
     const id = parseInt(params.id);
