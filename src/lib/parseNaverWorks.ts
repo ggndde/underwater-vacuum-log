@@ -1,10 +1,7 @@
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function parseComment(postTitle: string, commentBody: string, commentDateISO: string) {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   try {
     const prompt = `다음은 사내 네이버 웍스 게시판에 달린 댓글(업무 히스토리)입니다.
 게시글의 제목은 "[${postTitle}]"이며 이는 주로 고객사(업체명)를 의미합니다.
