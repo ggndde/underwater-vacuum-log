@@ -110,7 +110,7 @@ export function ChecklistCard({ item: initialItem, parts = [], done: initialDone
     // Client-side optimistic evaluation of 'completed'
     let crmHandled = true
     if (updatedItem.hasCrmUpdate) {
-        let keys = [...CRM_LABELS.map(l => l.key)]
+        const keys = [...CRM_LABELS.map(l => l.key)]
         if (updatedItem.crmType === 'NEW') keys.push('poolInfoUpdated')
         crmHandled = keys.every(k => isHandled(updatedItem[k]))
     } else if (updatedItem.hasDelivery) {

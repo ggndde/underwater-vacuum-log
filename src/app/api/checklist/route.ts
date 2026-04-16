@@ -87,7 +87,7 @@ export async function PATCH(req: NextRequest) {
         let crmHandled = true
         if (merged.hasCrmUpdate) {
             // 풀 고객관리: 모든 CRM 키가 처리되어야 완료
-            let keys = [...CRM_KEYS]
+            const keys = [...CRM_KEYS]
             if (merged.crmType === 'NEW') keys.push('poolInfoUpdated')
             crmHandled = keys.every(k => isHandled(merged[k]))
         } else if (merged.hasDelivery) {
