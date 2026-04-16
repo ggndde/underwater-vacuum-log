@@ -1,6 +1,7 @@
 ﻿'use server'
 
 import { prisma } from '@/lib/prisma'
+import type { Part } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
@@ -600,7 +601,7 @@ export async function batchAddChecklistPart(checklistId: number, parts: { partId
         // Fetch and validate stock
         const partIds = parts.map(p => p.partId)
         const dbParts = await prisma.part.findMany({ where: { id: { in: partIds } } })
-        const stockMap = new Map(dbParts.map(p => [p.id, p]))
+        const stockMap = new Map<number, Part>(dbParts.map((p: Part) => [p.id, p]))
 
         for (const p of parts) {
             const part = stockMap.get(p.partId)

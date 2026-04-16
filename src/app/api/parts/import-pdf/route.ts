@@ -59,7 +59,8 @@ export async function POST(req: NextRequest) {
     let pdfText: string
     try {
         // Dynamic import avoids the pdf-parse test-file initialization issue in Next.js
-        const pdfParse = (await import('pdf-parse')).default
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pdfParse = (await import('pdf-parse') as any).default
         const data = await pdfParse(buffer)
         pdfText = data.text
     } catch (err) {
