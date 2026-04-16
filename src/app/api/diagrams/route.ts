@@ -24,27 +24,27 @@ export async function GET(req: NextRequest) {
 }
 
 // ── Orientation detection prompt ──────────────────────────────────────────────
-const ORIENT_PROMPT = `You are looking at a technical diagram image that may be rotated.
+const ORIENT_PROMPT = `This is a technical engineering diagram that may be rotated. Your job is to determine how many degrees clockwise the image must be rotated to make it upright.
 
-Determine which rotation is needed to make the image upright (readable normally, with text horizontal).
+An upright diagram:
+- Has a title block (table with drawing number, date, company name) in the BOTTOM-RIGHT corner
+- Has readable left-to-right horizontal text throughout
+- Part numbers and labels are horizontal, not sideways
 
-Return ONLY valid JSON:
-{
-  "rotation": 0
-}
+Step 1: Find the title block (a bordered table, usually in a corner, containing a drawing number like "10000676" and a date like "22.06.2019").
+Step 2: Determine which corner the title block is currently in.
+Step 3: Decide the clockwise rotation needed so the title block ends up in the bottom-right.
 
-Where "rotation" is one of: 0, 90, 180, 270
-- 0 = already upright, no rotation needed
-- 90 = rotate 90° clockwise to fix
-- 180 = rotate 180° to fix (upside down)
-- 270 = rotate 270° clockwise (= 90° counter-clockwise) to fix
+Title block location → rotation needed:
+- Bottom-right already → 0 (already upright)
+- Bottom-left → 90 (rotate 90° CW)
+- Top-right → 270 (rotate 270° CW)
+- Top-left → 180 (rotate 180°)
 
-Hints:
-- Look for title block text, part numbers, dimension numbers, or any readable text
-- If text is readable left-to-right already, return 0
-- If text runs bottom-to-top (rotated 90° CCW), return 90
-- If text runs top-to-bottom (rotated 90° CW), return 270
-- If text is upside-down, return 180`
+If there is no visible title block, look for any readable text and choose the rotation that makes the text read left-to-right.
+
+Return ONLY valid JSON, nothing else:
+{"rotation": 0}`
 
 // ── Hotspot detection prompt ──────────────────────────────────────────────────
 const DETECT_PROMPT = `You are analyzing a technical parts diagram (exploded view drawing) from a pool cleaning equipment manufacturer.
@@ -75,24 +75,35 @@ Rules:
 - Do NOT include drawing numbers, revision codes, dates, or company names
 - Numbers like "10000676" (drawing number in title block) should be excluded`
 
-async function detectOrientation(openai: OpenAI, dataUrl: string): Promise<number> {
+async function detectOrientation(openai: OpenAI, buffer: Buffer): Promise<number> {
     try {
+        // Resize to max 1200px for orientation check — small enough to be cheap,
+        // large enough for GPT-4o to read the title block text clearly.
+        const thumb = Buffer.from(
+            await sharp(buffer)
+                .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+                .png()
+                .toBuffer()
+        )
+        const dataUrl = `data:image/png;base64,${thumb.toString('base64')}`
+
         const response = await openai.chat.completions.create({
             model: 'gpt-4o',
             messages: [{
                 role: 'user',
                 content: [
                     { type: 'text', text: ORIENT_PROMPT },
-                    { type: 'image_url', image_url: { url: dataUrl, detail: 'low' } },
+                    { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
                 ],
             }],
             response_format: { type: 'json_object' },
-            max_tokens: 64,
+            max_tokens: 128,
             temperature: 0,
         })
         const content = response.choices[0].message.content ?? '{}'
         const parsed = JSON.parse(content)
         const rotation = Number(parsed.rotation)
+        console.log(`방향 감지 결과: ${rotation}°`)
         if ([0, 90, 180, 270].includes(rotation)) return rotation
     } catch (err) {
         console.error('방향 감지 오류:', err)
@@ -132,14 +143,14 @@ export async function POST(req: NextRequest) {
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-    // Original buffer
-    let buffer: Buffer = Buffer.from(await file.arrayBuffer())
+    // Original buffer — first apply EXIF auto-rotation (handles camera/scanner images)
+    let buffer: Buffer = Buffer.from(
+        await sharp(Buffer.from(await file.arrayBuffer())).rotate().toBuffer()
+    )
     let finalMimeType = file.type
 
-    // Step 1: detect orientation using a quick low-detail check
-    const previewBase64 = buffer.toString('base64')
-    const previewUrl = `data:${file.type};base64,${previewBase64}`
-    const rotationNeeded = await detectOrientation(openai, previewUrl)
+    // Step 1: GPT-4o orientation check on thumbnail
+    const rotationNeeded = await detectOrientation(openai, buffer)
 
     // Step 2: rotate if needed
     if (rotationNeeded !== 0) {

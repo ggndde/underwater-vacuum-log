@@ -7,27 +7,27 @@ import sharp from 'sharp'
 
 export const dynamic = 'force-dynamic'
 
-const ORIENT_PROMPT = `You are looking at a technical diagram image that may be rotated.
+const ORIENT_PROMPT = `This is a technical engineering diagram that may be rotated. Your job is to determine how many degrees clockwise the image must be rotated to make it upright.
 
-Determine which rotation is needed to make the image upright (readable normally, with text horizontal).
+An upright diagram:
+- Has a title block (table with drawing number, date, company name) in the BOTTOM-RIGHT corner
+- Has readable left-to-right horizontal text throughout
+- Part numbers and labels are horizontal, not sideways
 
-Return ONLY valid JSON:
-{
-  "rotation": 0
-}
+Step 1: Find the title block (a bordered table, usually in a corner, containing a drawing number like "10000676" and a date like "22.06.2019").
+Step 2: Determine which corner the title block is currently in.
+Step 3: Decide the clockwise rotation needed so the title block ends up in the bottom-right.
 
-Where "rotation" is one of: 0, 90, 180, 270
-- 0 = already upright, no rotation needed
-- 90 = rotate 90° clockwise to fix
-- 180 = rotate 180° to fix (upside down)
-- 270 = rotate 270° clockwise (= 90° counter-clockwise) to fix
+Title block location → rotation needed:
+- Bottom-right already → 0 (already upright)
+- Bottom-left → 90 (rotate 90° CW)
+- Top-right → 270 (rotate 270° CW)
+- Top-left → 180 (rotate 180°)
 
-Hints:
-- Look for title block text, part numbers, dimension numbers, or any readable text
-- If text is readable left-to-right already, return 0
-- If text runs bottom-to-top (rotated 90° CCW), return 90
-- If text runs top-to-bottom (rotated 90° CW), return 270
-- If text is upside-down, return 180`
+If there is no visible title block, look for any readable text and choose the rotation that makes the text read left-to-right.
+
+Return ONLY valid JSON, nothing else:
+{"rotation": 0}`
 
 const DETECT_PROMPT = `You are analyzing a technical parts diagram (exploded view drawing) from a pool cleaning equipment manufacturer.
 
@@ -70,27 +70,39 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-    // Step 1: Detect orientation
+    // Decode stored image to buffer
+    const base64Data = diagram.imageData.split(',')[1]
+    let buffer = Buffer.from(base64Data, 'base64')
     let currentDataUrl: string = diagram.imageData
     let rotated = 0
 
+    // Step 1: Detect orientation using a 1200px thumbnail with detail: 'high'
     try {
+        const thumb = Buffer.from(
+            await sharp(buffer)
+                .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+                .png()
+                .toBuffer()
+        )
+        const thumbUrl = `data:image/png;base64,${thumb.toString('base64')}`
+
         const orientRes = await openai.chat.completions.create({
             model: 'gpt-4o',
             messages: [{
                 role: 'user',
                 content: [
                     { type: 'text', text: ORIENT_PROMPT },
-                    { type: 'image_url', image_url: { url: currentDataUrl, detail: 'low' } },
+                    { type: 'image_url', image_url: { url: thumbUrl, detail: 'high' } },
                 ],
             }],
             response_format: { type: 'json_object' },
-            max_tokens: 64,
+            max_tokens: 128,
             temperature: 0,
         })
         const orientContent = orientRes.choices[0].message.content ?? '{}'
         const orientParsed = JSON.parse(orientContent)
         const rotation = Number(orientParsed.rotation)
+        console.log(`재탐지 - 방향 감지 결과: ${rotation}°`)
         if ([0, 90, 180, 270].includes(rotation)) rotated = rotation
     } catch (err) {
         console.error('방향 감지 오류:', err)
@@ -100,11 +112,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     if (rotated !== 0) {
         try {
             console.log(`재탐지 - 이미지 자동 회전: ${rotated}°`)
-            const base64Data = currentDataUrl.split(',')[1]
-            const buffer = Buffer.from(base64Data, 'base64')
-            const rotatedBuffer = await sharp(buffer).rotate(rotated).png().toBuffer()
-            const newBase64 = rotatedBuffer.toString('base64')
-            currentDataUrl = `data:image/png;base64,${newBase64}`
+            buffer = Buffer.from(await sharp(buffer).rotate(rotated).png().toBuffer())
+            currentDataUrl = `data:image/png;base64,${buffer.toString('base64')}`
 
             await (prisma as any).diagramSheet.update({
                 where: { id },
@@ -112,7 +121,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
             })
         } catch (err) {
             console.error('이미지 회전 오류:', err)
-            rotated = 0 // fallback: skip rotation, use original
+            rotated = 0
         }
     }
 
