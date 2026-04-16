@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { ZoomIn, ZoomOut, RotateCcw, Search, Package, X, CheckCircle2, AlertCircle } from 'lucide-react'
 
 type Part = {
@@ -170,7 +170,7 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
         zoom(e.deltaY < 0 ? 1.1 : 0.9)
     }, [zoom])
 
-    // ── Pan ──────────────────────────────────────────────────────────────────
+    // ── Mouse Pan ────────────────────────────────────────────────────────────
     const handleMouseDown = (e: React.MouseEvent) => {
         if ((e.target as HTMLElement).closest('button[data-hotspot]')) return
         setIsDragging(true)
@@ -181,6 +181,75 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
         setOffset({ x: dragStart.ox + (e.clientX - dragStart.x), y: dragStart.oy + (e.clientY - dragStart.y) })
     }
     const handleMouseUp = () => setIsDragging(false)
+
+    // ── Touch Pan & Pinch-Zoom ────────────────────────────────────────────────
+    // useRef to store touch state so handlers don't recreate on every render
+    const touchRef = useRef<{ lastX: number; lastY: number; lastDist: number | null; startOffset: { x: number; y: number } } | null>(null)
+    const scaleRef = useRef(scale)
+    const offsetRef = useRef(offset)
+    scaleRef.current = scale
+    offsetRef.current = offset
+
+    useEffect(() => {
+        const el = containerRef.current
+        if (!el) return
+
+        const onTouchStart = (e: TouchEvent) => {
+            if (e.touches.length === 1) {
+                touchRef.current = {
+                    lastX: e.touches[0].clientX,
+                    lastY: e.touches[0].clientY,
+                    lastDist: null,
+                    startOffset: offsetRef.current,
+                }
+            } else if (e.touches.length === 2) {
+                const dist = Math.hypot(
+                    e.touches[1].clientX - e.touches[0].clientX,
+                    e.touches[1].clientY - e.touches[0].clientY
+                )
+                touchRef.current = {
+                    lastX: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                    lastY: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+                    lastDist: dist,
+                    startOffset: offsetRef.current,
+                }
+            }
+        }
+
+        const onTouchMove = (e: TouchEvent) => {
+            e.preventDefault()
+            if (!touchRef.current) return
+
+            if (e.touches.length === 1 && touchRef.current.lastDist === null) {
+                // Single finger pan
+                const dx = e.touches[0].clientX - touchRef.current.lastX
+                const dy = e.touches[0].clientY - touchRef.current.lastY
+                setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }))
+                touchRef.current.lastX = e.touches[0].clientX
+                touchRef.current.lastY = e.touches[0].clientY
+            } else if (e.touches.length === 2 && touchRef.current.lastDist !== null) {
+                // Two-finger pinch zoom
+                const dist = Math.hypot(
+                    e.touches[1].clientX - e.touches[0].clientX,
+                    e.touches[1].clientY - e.touches[0].clientY
+                )
+                const factor = dist / touchRef.current.lastDist
+                setScale(s => Math.min(8, Math.max(0.3, s * factor)))
+                touchRef.current.lastDist = dist
+            }
+        }
+
+        const onTouchEnd = () => { touchRef.current = null }
+
+        el.addEventListener('touchstart', onTouchStart, { passive: false })
+        el.addEventListener('touchmove', onTouchMove, { passive: false })
+        el.addEventListener('touchend', onTouchEnd)
+        return () => {
+            el.removeEventListener('touchstart', onTouchStart)
+            el.removeEventListener('touchmove', onTouchMove)
+            el.removeEventListener('touchend', onTouchEnd)
+        }
+    }, [])
 
     // ── Search / filter ───────────────────────────────────────────────────────
     const searchTerm = search.trim().toLowerCase()
@@ -201,14 +270,14 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
     return (
         <div className="flex flex-col h-[calc(100vh-80px)]">
             {/* ── Toolbar ── */}
-            <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-slate-200 flex-wrap">
+            <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-slate-200">
                 {/* Search */}
-                <div className="relative flex-1 min-w-40 max-w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
-                        placeholder="Art. No. 또는 부품명 검색"
+                        placeholder="Art. No. 검색"
                         className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     {search && (
@@ -218,32 +287,30 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
                     )}
                 </div>
 
-                {/* Stats */}
-                <div className="flex items-center gap-3 text-xs text-slate-500">
+                {/* Stats — hidden on very small screens */}
+                <div className="hidden sm:flex items-center gap-3 text-xs text-slate-500 shrink-0">
                     <span><span className="font-bold text-slate-700">{total}</span> Art. No.</span>
                     <span className="text-green-600"><CheckCircle2 className="inline w-3 h-3 mr-0.5" /><span className="font-bold">{registered}</span> 등록</span>
                     {outOfStock > 0 && <span className="text-red-500 font-semibold">품절 {outOfStock}개</span>}
                 </div>
 
-                <div className="flex-1" />
-
                 {/* Zoom controls */}
-                <div className="flex items-center gap-1">
-                    <button onClick={() => zoom(0.8)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"><ZoomOut className="w-4 h-4" /></button>
-                    <span className="text-xs text-slate-500 w-10 text-center">{Math.round(scale * 100)}%</span>
-                    <button onClick={() => zoom(1.25)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"><ZoomIn className="w-4 h-4" /></button>
-                    <button onClick={reset} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600"><RotateCcw className="w-4 h-4" /></button>
+                <div className="flex items-center gap-0.5 shrink-0">
+                    <button onClick={() => zoom(0.8)} className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-600"><ZoomOut className="w-4 h-4" /></button>
+                    <span className="text-xs text-slate-500 w-9 text-center hidden sm:inline">{Math.round(scale * 100)}%</span>
+                    <button onClick={() => zoom(1.25)} className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-600"><ZoomIn className="w-4 h-4" /></button>
+                    <button onClick={reset} className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-600"><RotateCcw className="w-4 h-4" /></button>
                 </div>
             </div>
 
             {/* ── Legend ── */}
-            <div className="flex items-center gap-4 px-4 py-1.5 bg-slate-50 border-b border-slate-100 text-xs text-slate-500">
-                <span className="font-semibold text-slate-400">범례</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> 재고 충분</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> 재고 부족</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" /> 품절</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block" /> 미등록</span>
-                <span className="text-slate-300 ml-1">· 점을 클릭하면 상세 정보가 표시됩니다</span>
+            <div className="flex items-center gap-3 px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-xs text-slate-500 overflow-x-auto">
+                <span className="font-semibold text-slate-400 shrink-0">범례</span>
+                <span className="flex items-center gap-1 shrink-0"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> 재고 충분</span>
+                <span className="flex items-center gap-1 shrink-0"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> 재고 부족</span>
+                <span className="flex items-center gap-1 shrink-0"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> 품절</span>
+                <span className="flex items-center gap-1 shrink-0"><span className="w-2 h-2 rounded-full bg-slate-400 inline-block" /> 미등록</span>
+                <span className="text-slate-300 ml-1 shrink-0 hidden sm:inline">· 점을 클릭하면 상세 정보가 표시됩니다</span>
             </div>
 
             {/* ── Canvas ── */}

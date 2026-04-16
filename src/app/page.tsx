@@ -95,36 +95,36 @@ export default async function Home() {
     ]
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-8">
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-8 pb-24 sm:pb-8">
             {/* Header */}
-            <div className="text-center mb-16">
-                <p className="text-slate-500 text-sm font-semibold tracking-[0.25em] uppercase mb-4">
+            <div className="text-center mb-8 sm:mb-16">
+                <p className="text-slate-500 text-xs sm:text-sm font-semibold tracking-[0.25em] uppercase mb-3 sm:mb-4">
                     수중 청소기 서비스 관리 시스템
                 </p>
-                <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tight">
+                <h1 className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
                     Rosin Systech
-                    <span className="text-slate-500 dark:text-slate-400 font-light ml-3 text-3xl">CO., LTD</span>
+                    <span className="text-slate-500 dark:text-slate-400 font-light ml-2 sm:ml-3 text-xl sm:text-3xl">CO., LTD</span>
                 </h1>
-                <div className="mt-5 w-14 h-0.5 bg-gradient-to-r from-blue-500 to-violet-500 mx-auto rounded-full" />
+                <div className="mt-4 sm:mt-5 w-14 h-0.5 bg-gradient-to-r from-blue-500 to-violet-500 mx-auto rounded-full" />
             </div>
 
             {/* Tiles */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5 w-full max-w-6xl">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-5 w-full max-w-6xl">
                 {tiles.map(({ href, icon: Icon, label, sub, color, glow }) => (
                     <Link
                         key={href}
                         href={href}
-                        className={`group relative bg-gradient-to-br ${color} rounded-2xl p-7 shadow-xl ${glow} hover:scale-105 transition-transform duration-200`}
+                        className={`group relative bg-gradient-to-br ${color} rounded-2xl p-5 sm:p-7 shadow-xl ${glow} hover:scale-105 active:scale-95 transition-transform duration-200`}
                     >
                         <div className="absolute inset-0 rounded-2xl bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <Icon className="w-10 h-10 text-white/80 mb-5" />
-                        <p className="text-white font-bold text-xl leading-tight">{label}</p>
-                        <p className="text-white/60 text-sm mt-2">{sub}</p>
+                        <Icon className="w-8 h-8 sm:w-10 sm:h-10 text-white/80 mb-3 sm:mb-5" />
+                        <p className="text-white font-bold text-base sm:text-xl leading-tight">{label}</p>
+                        <p className="text-white/60 text-xs sm:text-sm mt-1.5 sm:mt-2">{sub}</p>
                     </Link>
                 ))}
             </div>
 
-            <p className="mt-16 text-slate-500 dark:text-slate-700 text-sm">
+            <p className="mt-8 sm:mt-16 text-slate-500 dark:text-slate-700 text-xs sm:text-sm">
                 © 2026 Rosin Systech CO., LTD. All rights reserved.
             </p>
         </div>

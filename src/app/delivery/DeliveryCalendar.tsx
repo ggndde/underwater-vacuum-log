@@ -537,7 +537,7 @@ export function DeliveryCalendar({ employees }: { employees: string[] }) {
                     <div className="grid grid-cols-7">
                         {calendarCells.map((date, idx) => {
                             if (!date) {
-                                return <div key={`empty-${idx}`} className="border-b border-r border-slate-100 min-h-[150px]" />
+                                return <div key={`empty-${idx}`} className="border-b border-r border-slate-100 min-h-[60px] sm:min-h-[130px]" />
                             }
 
                             const key = toLocalDateString(date)
@@ -551,16 +551,24 @@ export function DeliveryCalendar({ employees }: { employees: string[] }) {
                                 <div
                                     key={key}
                                     onClick={() => setSelectedDate(d => d && toLocalDateString(d) === key ? null : date)}
-                                    className={`relative border-b border-r border-slate-100 min-h-[150px] p-2 cursor-pointer transition-all
+                                    className={`relative border-b border-r border-slate-100 min-h-[60px] sm:min-h-[130px] p-1 sm:p-2 cursor-pointer transition-all
                                         ${isSelected ? 'bg-blue-50 ring-2 ring-inset ring-blue-400' : 'hover:bg-slate-50'}
                                     `}
                                 >
-                                    <div className={`text-base font-bold w-8 h-8 flex items-center justify-center rounded-full mb-1
+                                    <div className={`text-xs sm:text-base font-bold w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full mb-0.5 sm:mb-1
                                         ${isToday ? 'bg-blue-600 text-white' : isSunday ? 'text-red-400' : isWeekend ? 'text-blue-500' : 'text-slate-700'}`}
                                     >
                                         {date.getDate()}
                                     </div>
-                                    <div className="space-y-0.5">
+                                    {/* Mobile: colored dots per delivery. Desktop: full badges */}
+                                    <div className="flex flex-wrap gap-0.5 sm:hidden">
+                                        {dayDeliveries.slice(0, 5).map(d => {
+                                            const cfg = STATUS_CONFIG[d.status] || STATUS_CONFIG['예정']
+                                            return <span key={d.id} className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                                        })}
+                                        {dayDeliveries.length > 5 && <span className="text-[9px] leading-none text-slate-400">+{dayDeliveries.length - 5}</span>}
+                                    </div>
+                                    <div className="hidden sm:block space-y-0.5">
                                         {dayDeliveries.slice(0, 3).map(d => (
                                             <DeliveryBadge key={d.id} delivery={d} onClick={() => openEdit(d)} />
                                         ))}

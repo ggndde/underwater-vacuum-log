@@ -7,27 +7,21 @@ import sharp from 'sharp'
 
 export const dynamic = 'force-dynamic'
 
-const ORIENT_PROMPT = `This is a technical engineering diagram that may be rotated. Your job is to determine how many degrees clockwise the image must be rotated to make it upright.
+const ORIENT_PROMPT = `You are shown 4 versions of the same technical engineering diagram, each rotated differently:
+- Image 1: 0° (original as uploaded)
+- Image 2: 90° clockwise
+- Image 3: 180°
+- Image 4: 270° clockwise
 
-An upright diagram:
-- Has a title block (table with drawing number, date, company name) in the BOTTOM-RIGHT corner
-- Has readable left-to-right horizontal text throughout
-- Part numbers and labels are horizontal, not sideways
+Select the version that is CORRECTLY oriented (upright). In the correct orientation:
+- Text reads left-to-right horizontally
+- The title block (bordered table with drawing number, revision letter, date) is in the BOTTOM-RIGHT corner
+- Part numbers and labels are readable without tilting your head
 
-Step 1: Find the title block (a bordered table, usually in a corner, containing a drawing number like "10000676" and a date like "22.06.2019").
-Step 2: Determine which corner the title block is currently in.
-Step 3: Decide the clockwise rotation needed so the title block ends up in the bottom-right.
+Return ONLY valid JSON:
+{"correct": 1}
 
-Title block location → rotation needed:
-- Bottom-right already → 0 (already upright)
-- Bottom-left → 90 (rotate 90° CW)
-- Top-right → 270 (rotate 270° CW)
-- Top-left → 180 (rotate 180°)
-
-If there is no visible title block, look for any readable text and choose the rotation that makes the text read left-to-right.
-
-Return ONLY valid JSON, nothing else:
-{"rotation": 0}`
+Where the number is 1, 2, 3, or 4 corresponding to the image that is upright.`
 
 const DETECT_PROMPT = `You are analyzing a technical parts diagram (exploded view drawing) from a pool cleaning equipment manufacturer.
 
@@ -76,15 +70,19 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     let currentDataUrl: string = diagram.imageData
     let rotated = 0
 
-    // Step 1: Detect orientation using a 1200px thumbnail with detail: 'high'
+    // Step 1: Generate 4 thumbnails and let GPT-4o pick the upright one
     try {
-        const thumb = Buffer.from(
-            await sharp(buffer)
-                .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-                .png()
-                .toBuffer()
-        )
-        const thumbUrl = `data:image/png;base64,${thumb.toString('base64')}`
+        const rotations = [0, 90, 180, 270]
+        const thumbUrls = await Promise.all(rotations.map(async (deg) => {
+            const rotBuf = Buffer.from(
+                await sharp(buffer)
+                    .rotate(deg)
+                    .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
+                    .png()
+                    .toBuffer()
+            )
+            return `data:image/png;base64,${rotBuf.toString('base64')}`
+        }))
 
         const orientRes = await openai.chat.completions.create({
             model: 'gpt-4o',
@@ -92,18 +90,22 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
                 role: 'user',
                 content: [
                     { type: 'text', text: ORIENT_PROMPT },
-                    { type: 'image_url', image_url: { url: thumbUrl, detail: 'high' } },
+                    { type: 'image_url', image_url: { url: thumbUrls[0], detail: 'low' } },
+                    { type: 'image_url', image_url: { url: thumbUrls[1], detail: 'low' } },
+                    { type: 'image_url', image_url: { url: thumbUrls[2], detail: 'low' } },
+                    { type: 'image_url', image_url: { url: thumbUrls[3], detail: 'low' } },
                 ],
             }],
             response_format: { type: 'json_object' },
-            max_tokens: 128,
+            max_tokens: 64,
             temperature: 0,
         })
         const orientContent = orientRes.choices[0].message.content ?? '{}'
         const orientParsed = JSON.parse(orientContent)
-        const rotation = Number(orientParsed.rotation)
-        console.log(`재탐지 - 방향 감지 결과: ${rotation}°`)
-        if ([0, 90, 180, 270].includes(rotation)) rotated = rotation
+        const correct = Number(orientParsed.correct)
+        const rotation = rotations[(correct - 1)] ?? 0
+        console.log(`재탐지 - 방향 감지: 이미지${correct} 선택 → ${rotation}° 회전 필요`)
+        if (correct >= 1 && correct <= 4) rotated = rotation
     } catch (err) {
         console.error('방향 감지 오류:', err)
     }
