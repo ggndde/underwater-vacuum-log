@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import type { Part } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -20,11 +21,11 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     if (!diagram) return NextResponse.json({ error: '도면을 찾을 수 없습니다.' }, { status: 404 })
 
     // Enrich hotspots with part info from DB
-    const articleNos = [...new Set((diagram.hotspots as any[]).map((h: any) => h.articleNo))]
+    const articleNos = Array.from(new Set((diagram.hotspots as any[]).map((h: any) => h.articleNo))) as string[]
     const parts = articleNos.length > 0
-        ? await prisma.part.findMany({ where: { articleNo: { in: articleNos as string[] } } })
+        ? await prisma.part.findMany({ where: { articleNo: { in: articleNos } } })
         : []
-    const partMap = new Map(parts.map(p => [p.articleNo, p]))
+    const partMap = new Map<string, Part>(parts.map((p: Part) => [p.articleNo, p]))
 
     const enrichedHotspots = (diagram.hotspots as any[]).map((h: any) => ({
         ...h,

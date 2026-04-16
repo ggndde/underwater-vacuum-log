@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/prisma'
+import type { Part } from '@prisma/client'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Tag } from 'lucide-react'
@@ -16,11 +17,11 @@ export default async function DiagramDetailPage({ params }: { params: { id: stri
     if (!diagram) notFound()
 
     // Enrich hotspots with part data
-    const articleNos = [...new Set((diagram.hotspots as any[]).map((h: any) => h.articleNo))]
+    const articleNos = Array.from(new Set((diagram.hotspots as any[]).map((h: any) => h.articleNo))) as string[]
     const parts = articleNos.length > 0
-        ? await prisma.part.findMany({ where: { articleNo: { in: articleNos as string[] } } })
+        ? await prisma.part.findMany({ where: { articleNo: { in: articleNos } } })
         : []
-    const partMap = new Map(parts.map(p => [p.articleNo, p]))
+    const partMap = new Map<string, Part>(parts.map((p: Part) => [p.articleNo, p]))
 
     const enriched = {
         ...diagram,
