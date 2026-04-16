@@ -1,10 +1,8 @@
 export const dynamic = 'force-dynamic';
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { Users } from 'lucide-react'
 import AddClientModal from './AddClientModal'
-
-const prisma = new PrismaClient()
 
 export default async function ClientsPage() {
     const customers = await prisma.customer.findMany({

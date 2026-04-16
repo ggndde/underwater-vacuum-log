@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import Link from 'next/link'
 import {
     Upload, X, Loader2, FileImage, Trash2, AlertCircle,
-    MapPin, Calendar, Tag, BookOpen,
+    MapPin, Calendar, Tag, BookOpen, RefreshCw,
 } from 'lucide-react'
 
 const CATEGORIES = ['CP', 'PP', 'NV3', '공용'] as const
@@ -198,6 +198,7 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
 export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
     const [diagrams, setDiagrams] = useState(initial)
     const [showUpload, setShowUpload] = useState(false)
+    const [redetecting, setRedetecting] = useState<number | null>(null)
 
     async function refresh() {
         try {
@@ -211,6 +212,27 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
         if (!confirm(`"${name}" 도면을 삭제할까요?`)) return
         await fetch(`/api/diagrams/${id}`, { method: 'DELETE' })
         setDiagrams(prev => prev.filter(d => d.id !== id))
+    }
+
+    async function handleRedetect(id: number) {
+        if (!confirm('AI가 Art. No. 위치를 다시 감지합니다. 기존 위치 정보가 모두 교체됩니다. 계속할까요?')) return
+        setRedetecting(id)
+        try {
+            const res = await fetch(`/api/diagrams/${id}/redetect`, { method: 'POST' })
+            const json = await res.json()
+            if (res.ok) {
+                setDiagrams(prev => prev.map(d =>
+                    d.id === id ? { ...d, _count: { hotspots: json.detectedCount } } : d
+                ))
+                alert(`재탐지 완료: ${json.detectedCount}개 Art. No. 감지됨`)
+            } else {
+                alert(json.error ?? '재탐지에 실패했습니다.')
+            }
+        } catch {
+            alert('네트워크 오류가 발생했습니다.')
+        } finally {
+            setRedetecting(null)
+        }
     }
 
     const fmt = new Intl.DateTimeFormat('ko', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -261,12 +283,25 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                                     <Link href={`/diagrams/${d.id}`} className="font-semibold text-slate-800 hover:text-blue-600 transition-colors leading-tight">
                                         {d.name}
                                     </Link>
-                                    <button
-                                        onClick={() => handleDelete(d.id, d.name)}
-                                        className="shrink-0 text-slate-300 hover:text-red-400 transition-colors mt-0.5"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={() => handleRedetect(d.id)}
+                                            disabled={redetecting === d.id}
+                                            title="AI 재탐지"
+                                            className="text-slate-300 hover:text-blue-400 transition-colors mt-0.5 disabled:cursor-not-allowed"
+                                        >
+                                            {redetecting === d.id
+                                                ? <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+                                                : <RefreshCw className="w-4 h-4" />
+                                            }
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(d.id, d.name)}
+                                            className="text-slate-300 hover:text-red-400 transition-colors mt-0.5"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-2 mt-2.5">

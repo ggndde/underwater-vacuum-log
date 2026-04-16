@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '@/lib/prisma'
 import { Plus, CheckCircle2, Clock, AlertTriangle, ChevronRight } from 'lucide-react'
 import { ChecklistCard } from './ChecklistCard'
 import { DateNav } from './DateNav'
@@ -7,8 +7,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
-
-const prisma = new PrismaClient()
 
 function getTodayKSTString(): string {
     const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));

@@ -1,11 +1,9 @@
 export const dynamic = 'force-dynamic';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Camera, CheckCircle, SkipForward } from 'lucide-react';
 import { confirmPhotos, skipPhotos } from '@/app/actions';
-
-const prisma = new PrismaClient();
 
 export default async function PhotosPage({ params }: { params: { id: string; logId: string } }) {
     const customerId = parseInt(params.id);

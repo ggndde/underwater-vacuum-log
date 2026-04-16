@@ -1,11 +1,9 @@
 export const dynamic = 'force-dynamic';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import MachineForm from './MachineForm';
-
-const prisma = new PrismaClient();
 
 export default async function MachinePage({ params }: { params: { id: string; machineId: string } }) {
     const customerId = parseInt(params.id);
