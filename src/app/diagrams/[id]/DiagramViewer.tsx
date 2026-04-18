@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ZoomIn, ZoomOut, RotateCcw, Search, Package, X, CheckCircle2, AlertCircle } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Search, Package, X, CheckCircle2, AlertCircle, RotateCw, Loader2 } from 'lucide-react'
 
 type Part = {
     id: number
@@ -157,6 +157,25 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
     const [selected, setSelected] = useState<Hotspot | null>(null)
     const [search, setSearch] = useState('')
     const [hoveredArticle, setHoveredArticle] = useState<string | null>(null)
+    const [imgCacheBust, setImgCacheBust] = useState(0)
+    const [rotating, setRotating] = useState(false)
+
+    // ── Manual rotation ───────────────────────────────────────────────────────
+    const handleRotate = useCallback(async (degrees: 90 | 270) => {
+        setRotating(true)
+        try {
+            await fetch(`/api/diagrams/${diagram.id}/rotate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ degrees }),
+            })
+            // Cache-bust the img src so the browser reloads the new image
+            setImgCacheBust(n => n + 1)
+            setSelected(null)
+        } finally {
+            setRotating(false)
+        }
+    }, [diagram.id])
 
     // ── Zoom ─────────────────────────────────────────────────────────────────
     const zoom = useCallback((factor: number) => {
@@ -294,12 +313,32 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
                     {outOfStock > 0 && <span className="text-red-500 font-semibold">품절 {outOfStock}개</span>}
                 </div>
 
+                {/* Rotate image buttons */}
+                <div className="flex items-center gap-0.5 shrink-0 border-r border-slate-200 pr-2 mr-0.5">
+                    <button
+                        onClick={() => handleRotate(270)}
+                        disabled={rotating}
+                        title="반시계 방향 90° 회전"
+                        className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-600 disabled:opacity-40"
+                    >
+                        <RotateCcw className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => handleRotate(90)}
+                        disabled={rotating}
+                        title="시계 방향 90° 회전"
+                        className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-600 disabled:opacity-40"
+                    >
+                        {rotating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+                    </button>
+                </div>
+
                 {/* Zoom controls */}
                 <div className="flex items-center gap-0.5 shrink-0">
                     <button onClick={() => zoom(0.8)} className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-600"><ZoomOut className="w-4 h-4" /></button>
                     <span className="text-xs text-slate-500 w-9 text-center hidden sm:inline">{Math.round(scale * 100)}%</span>
                     <button onClick={() => zoom(1.25)} className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-600"><ZoomIn className="w-4 h-4" /></button>
-                    <button onClick={reset} className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-600"><RotateCcw className="w-4 h-4" /></button>
+                    <button onClick={reset} title="뷰 초기화" className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-500"><RotateCcw className="w-3.5 h-3.5" /></button>
                 </div>
             </div>
 
@@ -338,7 +377,7 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
                     {/* Diagram image */}
                     <div className="relative inline-block shadow-xl">
                         <img
-                            src={`/api/diagrams/${diagram.id}/image`}
+                            src={`/api/diagrams/${diagram.id}/image${imgCacheBust > 0 ? `?v=${imgCacheBust}` : ''}`}
                             alt={diagram.name}
                             draggable={false}
                             className="block max-w-none"
