@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
+import sharp from 'sharp'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,20 +23,37 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ diagrams })
 }
 
-// ── POST: upload image + AI hotspot detection ─────────────────────────────────
+// ── Orientation detection prompt ──────────────────────────────────────────────
+const ORIENT_PROMPT = `You are shown 4 versions of the same technical engineering diagram, each rotated differently:
+- Image 1: 0° (original as uploaded)
+- Image 2: 90° clockwise
+- Image 3: 180°
+- Image 4: 270° clockwise
+
+Select the version that is CORRECTLY oriented (upright). In the correct orientation:
+- Text reads left-to-right horizontally
+- The title block (bordered table with drawing number, revision letter, date) is in the BOTTOM-RIGHT corner
+- Part numbers and labels are readable without tilting your head
+
+Return ONLY valid JSON:
+{"correct": 1}
+
+Where the number is 1, 2, 3, or 4 corresponding to the image that is upright.`
+
+// ── Hotspot detection prompt ──────────────────────────────────────────────────
 const DETECT_PROMPT = `You are analyzing a technical parts diagram (exploded view drawing) from a pool cleaning equipment manufacturer.
 
 Your task: find every Article Number (part number) in this image.
 
-IMPORTANT: Text in these diagrams is often rotated 90 degrees sideways (especially along the left or right edge). You MUST read rotated text carefully.
+The image has been pre-rotated to be upright. All text should now be horizontal and readable.
 
 Article numbers in this type of diagram are typically:
 - 5 to 7 digit numbers (e.g. 122011, 118601, 122260, 124448)
 - Sometimes prefixed with nothing, sometimes near arrows pointing to parts
-- Often listed in a column on the left side of the image, rotated 90° counterclockwise
+- Often listed in a column on the left or right side, or along the edges
 - Each number is associated with a part in the exploded view
 
-For each article number found, estimate its center position as a percentage of the total image width (x) and height (y), measured from the top-left corner (before any rotation).
+For each article number found, estimate its center position as a percentage of the total image width (x) and height (y), measured from the top-left corner.
 
 Return ONLY valid JSON in this exact format:
 {
@@ -45,12 +63,65 @@ Return ONLY valid JSON in this exact format:
 }
 
 Rules:
-- Read ALL rotated/sideways numbers carefully — this is critical
 - Include every part number you can find, even if you are not 100% certain
-- x and y are coordinates in the ORIGINAL image orientation (top-left = 0,0)
+- x and y are coordinates (top-left = 0,0), values between 0 and 100
 - label = nearby part description text, or "" if none
 - Do NOT include drawing numbers, revision codes, dates, or company names
 - Numbers like "10000676" (drawing number in title block) should be excluded`
+
+async function detectOrientation(openai: OpenAI, buffer: Buffer): Promise<number> {
+    try {
+        // Generate 4 small thumbnails at 0°, 90°, 180°, 270°
+        // and let GPT-4o pick which one looks upright — far more reliable
+        // than describing which corner the title block should be in.
+        const rotations = [0, 90, 180, 270]
+        const thumbUrls = await Promise.all(rotations.map(async (deg) => {
+            const rotBuf = Buffer.from(
+                await sharp(buffer)
+                    .rotate(deg)
+                    .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
+                    .png()
+                    .toBuffer()
+            )
+            return `data:image/png;base64,${rotBuf.toString('base64')}`
+        }))
+
+        const response = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [{
+                role: 'user',
+                content: [
+                    { type: 'text', text: ORIENT_PROMPT },
+                    { type: 'image_url', image_url: { url: thumbUrls[0], detail: 'low' } },
+                    { type: 'image_url', image_url: { url: thumbUrls[1], detail: 'low' } },
+                    { type: 'image_url', image_url: { url: thumbUrls[2], detail: 'low' } },
+                    { type: 'image_url', image_url: { url: thumbUrls[3], detail: 'low' } },
+                ],
+            }],
+            response_format: { type: 'json_object' },
+            max_tokens: 64,
+            temperature: 0,
+        })
+        const content = response.choices[0].message.content ?? '{}'
+        const parsed = JSON.parse(content)
+        const correct = Number(parsed.correct)
+        const rotation = rotations[(correct - 1)] ?? 0  // 1→0°, 2→90°, 3→180°, 4→270°
+        console.log(`방향 감지 결과: 이미지${correct} 선택 → ${rotation}° 회전 필요`)
+        if (correct >= 1 && correct <= 4) return rotation
+    } catch (err) {
+        console.error('방향 감지 오류:', err)
+    }
+    return 0
+}
+
+async function rotateImageBuffer(buffer: Buffer, mimeType: string, degrees: number): Promise<{ buffer: Buffer; mimeType: string }> {
+    if (degrees === 0) return { buffer, mimeType }
+
+    // sharp rotation: positive = clockwise
+    // Convert to PNG after rotation (lossless, avoids JPEG re-compression artifacts)
+    const png = Buffer.from(await sharp(buffer).rotate(degrees).png().toBuffer())
+    return { buffer: png, mimeType: 'image/png' }
+}
 
 export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
@@ -73,13 +144,31 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: '파일 크기는 15MB 이하여야 합니다.' }, { status: 400 })
     }
 
-    // Convert to base64 data URL
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const base64 = buffer.toString('base64')
-    const dataUrl = `data:${file.type};base64,${base64}`
-
-    // GPT-4o Vision: detect hotspots
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+    // Apply EXIF auto-rotation first (handles camera/scanner images with EXIF orientation)
+    // Then normalize to PNG for consistent processing
+    let finalMimeType = 'image/png'
+    let buffer: Buffer = Buffer.from(
+        await sharp(Buffer.from(await file.arrayBuffer())).rotate().png().toBuffer()
+    )
+
+    // Step 1: GPT-4o orientation check on thumbnail
+    const rotationNeeded = await detectOrientation(openai, buffer)
+
+    // Step 2: rotate if needed
+    if (rotationNeeded !== 0) {
+        console.log(`이미지 자동 회전: ${rotationNeeded}°`)
+        const result = await rotateImageBuffer(buffer, finalMimeType, rotationNeeded)
+        buffer = result.buffer
+        finalMimeType = result.mimeType
+    }
+
+    // Step 3: build final data URL from (possibly rotated) buffer
+    const base64 = buffer.toString('base64')
+    const dataUrl = `data:${finalMimeType};base64,${base64}`
+
+    // Step 4: GPT-4o Vision hotspot detection on upright image
     let hotspots: Array<{ articleNo: string; x: number; y: number; label: string }> = []
 
     try {
@@ -122,7 +211,7 @@ export async function POST(req: NextRequest) {
             drawingNo,
             category,
             imageData: dataUrl,
-            mimeType: file.type,
+            mimeType: finalMimeType,
             hotspots: {
                 create: hotspots.map(h => ({
                     articleNo: h.articleNo,
@@ -135,5 +224,9 @@ export async function POST(req: NextRequest) {
         include: { hotspots: true },
     })
 
-    return NextResponse.json({ diagram, detectedCount: hotspots.length }, { status: 201 })
+    return NextResponse.json({
+        diagram,
+        detectedCount: hotspots.length,
+        rotated: rotationNeeded !== 0 ? rotationNeeded : null,
+    }, { status: 201 })
 }
