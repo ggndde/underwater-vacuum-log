@@ -9,7 +9,7 @@ const CATEGORIES = ['CP', 'PP', 'NV3', '공용'] as const
 
 export default async function PartsPage() {
     const parts = await prisma.part.findMany({
-        include: { transactions: { orderBy: { createdAt: 'asc' } } },
+        include: { transactions: { orderBy: { createdAt: 'desc' }, take: 30 } },
         orderBy: [{ category: 'asc' }, { name: 'asc' }]
     })
 

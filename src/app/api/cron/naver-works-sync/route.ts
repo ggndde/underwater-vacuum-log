@@ -93,11 +93,16 @@ export async function GET(req: Request) {
                   const parsed = await parseComment(post.title || '', commentText, comment.createdTime || new Date().toISOString());
 
                   if (parsed && parsed.customerName) {
-                    
-                    // 1. Delivery Logic ALWAYS executes if parsed.isDelivery is true
-                    if (parsed.isDelivery) {
+
+                    // 고객사 존재 여부 먼저 확인
+                    const customer = await prisma.customer.findFirst({
+                      where: { name: { contains: parsed.customerName } }
+                    });
+
+                    // 1. 납품 일정: 고객사가 DB에 있을 때만 생성
+                    if (parsed.isDelivery && customer) {
                       const pendingDelivery = await prisma.delivery.findFirst({
-                        where: { 
+                        where: {
                           destination: { contains: parsed.customerName },
                           status: '예정'
                         }
@@ -107,7 +112,7 @@ export async function GET(req: Request) {
                       if (parsed.deliveryDate) {
                         const parsedDate = new Date(parsed.deliveryDate);
                         if (!isNaN(parsedDate.getTime())) {
-                            targetDate = parsedDate;
+                          targetDate = parsedDate;
                         }
                       }
 
@@ -115,7 +120,7 @@ export async function GET(req: Request) {
                         await prisma.delivery.update({
                           where: { id: pendingDelivery.id },
                           data: {
-                            date: targetDate, 
+                            date: targetDate,
                             memo: pendingDelivery.memo ? `${pendingDelivery.memo}\n[추가] ${parsed.content}` : parsed.content
                           }
                         });
@@ -137,24 +142,17 @@ export async function GET(req: Request) {
                       }
                     }
 
-                    // 2. Service Log (Customer History) Logic
-                    // ONLY executes if customer and machine exist in DB
-                    const customer = await prisma.customer.findFirst({
-                      where: { name: { contains: parsed.customerName } }
-                    });
-
+                    // 2. 서비스 로그: 고객사 + 기기 모두 있을 때만 생성
                     if (customer) {
-                      // Find placeholder machine
                       const firstMachine = await prisma.machine.findFirst({
                         where: { customerId: customer.id }
                       });
 
                       if (firstMachine) {
-                        // Create History Log
                         await prisma.serviceLog.create({
                           data: {
                             date: new Date(comment.createdTime || Date.now()),
-                            type: parsed.isDelivery ? 'DELIVERY' : 'VISIT', 
+                            type: parsed.isDelivery ? 'DELIVERY' : 'VISIT',
                             body: parsed.content,
                             machineId: firstMachine.id,
                             externalId: commentId,
