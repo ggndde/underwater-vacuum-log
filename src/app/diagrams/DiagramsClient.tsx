@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import Link from 'next/link'
 import {
     Upload, X, Loader2, FileImage, Trash2, AlertCircle,
-    MapPin, Calendar, Tag, BookOpen, RefreshCw,
+    Calendar, Tag, BookOpen, CheckCircle2,
 } from 'lucide-react'
 
 const CATEGORIES = ['CP', 'PP', 'NV3', '공용'] as const
@@ -26,61 +26,88 @@ type DiagramMeta = {
     _count: { hotspots: number }
 }
 
+type FileItem = {
+    file: File
+    name: string
+    drawingNo: string
+    category: string
+    status: 'pending' | 'uploading' | 'done' | 'error'
+    error?: string
+}
+
 // ── Upload Modal ──────────────────────────────────────────────────────────────
 function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded: () => void }) {
     const fileRef = useRef<HTMLInputElement>(null)
-    const [file, setFile] = useState<File | null>(null)
-    const [preview, setPreview] = useState<string | null>(null)
-    const [name, setName] = useState('')
-    const [drawingNo, setDrawingNo] = useState('')
-    const [category, setCategory] = useState<string>('공용')
-    const [step, setStep] = useState<'form' | 'uploading' | 'done'>('form')
-    const [error, setError] = useState<string | null>(null)
-    const [detectedCount, setDetectedCount] = useState(0)
+    const [items, setItems] = useState<FileItem[]>([])
+    const [uploading, setUploading] = useState(false)
+    const [allDone, setAllDone] = useState(false)
 
-    function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-        const f = e.target.files?.[0]
-        if (!f) return
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) {
-            setError('JPG, PNG, WEBP 이미지만 지원합니다.')
-            return
-        }
-        setFile(f)
-        setError(null)
-        // auto-fill name from filename
-        if (!name) setName(f.name.replace(/\.[^.]+$/, ''))
-        const reader = new FileReader()
-        reader.onload = (ev) => setPreview(ev.target?.result as string)
-        reader.readAsDataURL(f)
+    function handleFilesSelect(e: React.ChangeEvent<HTMLInputElement>) {
+        const files = Array.from(e.target.files ?? [])
+        const valid = files.filter(f => ['image/jpeg', 'image/png', 'image/webp'].includes(f.type))
+        setItems(prev => [
+            ...prev,
+            ...valid.map(f => ({
+                file: f,
+                name: f.name.replace(/\.[^.]+$/, ''),
+                drawingNo: '',
+                category: '공용',
+                status: 'pending' as const,
+            }))
+        ])
+        // reset input so same file can be added again if needed
+        e.target.value = ''
+    }
+
+    function removeItem(idx: number) {
+        setItems(prev => prev.filter((_, i) => i !== idx))
+    }
+
+    function updateItem(idx: number, patch: Partial<FileItem>) {
+        setItems(prev => prev.map((it, i) => i === idx ? { ...it, ...patch } : it))
     }
 
     async function handleUpload() {
-        if (!file || !name.trim()) return
-        setStep('uploading')
-        setError(null)
+        const pending = items.filter(it => it.status === 'pending')
+        if (pending.length === 0) return
+        setUploading(true)
 
-        const fd = new FormData()
-        fd.append('file', file)
-        fd.append('name', name.trim())
-        fd.append('drawingNo', drawingNo.trim())
-        fd.append('category', category)
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].status !== 'pending') continue
+            updateItem(i, { status: 'uploading' })
 
-        try {
-            const res = await fetch('/api/diagrams', { method: 'POST', body: fd })
-            const json = await res.json()
-            if (!res.ok) { setError(json.error ?? '업로드 실패'); setStep('form'); return }
-            setDetectedCount(json.detectedCount ?? 0)
-            setStep('done')
-        } catch {
-            setError('네트워크 오류가 발생했습니다.')
-            setStep('form')
+            const it = items[i]
+            const fd = new FormData()
+            fd.append('file', it.file)
+            fd.append('name', it.name.trim() || it.file.name)
+            fd.append('drawingNo', it.drawingNo.trim())
+            fd.append('category', it.category)
+
+            try {
+                const res = await fetch('/api/diagrams', { method: 'POST', body: fd })
+                const json = await res.json()
+                if (!res.ok) {
+                    updateItem(i, { status: 'error', error: json.error ?? '업로드 실패' })
+                } else {
+                    updateItem(i, { status: 'done' })
+                }
+            } catch {
+                updateItem(i, { status: 'error', error: '네트워크 오류' })
+            }
         }
+
+        setUploading(false)
+        setAllDone(true)
+        onUploaded()
     }
+
+    const pendingCount = items.filter(it => it.status === 'pending').length
+    const doneCount = items.filter(it => it.status === 'done').length
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
                     <h2 className="font-bold text-slate-800 flex items-center gap-2">
                         <FileImage className="w-5 h-5 text-blue-500" />
                         도면 추가
@@ -88,107 +115,104 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
                 </div>
 
-                <div className="p-6 space-y-4">
-                    {error && (
-                        <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-                            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />{error}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    {/* Drop zone / add more */}
+                    {!allDone && (
+                        <div
+                            onClick={() => fileRef.current?.click()}
+                            className="border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors flex flex-col items-center py-6 gap-2 text-slate-400"
+                        >
+                            <Upload className="w-7 h-7" />
+                            <p className="text-sm font-medium">클릭하여 도면 이미지 선택</p>
+                            <p className="text-xs">JPG · PNG · WEBP · 여러 장 동시 선택 가능</p>
+                            <input
+                                ref={fileRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                multiple
+                                className="hidden"
+                                onChange={handleFilesSelect}
+                            />
                         </div>
                     )}
 
-                    {step === 'uploading' && (
-                        <div className="flex flex-col items-center py-12 gap-4">
-                            <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
-                            <div className="text-center">
-                                <p className="font-semibold text-slate-700">이미지 분석 중…</p>
-                                <p className="text-sm text-slate-400 mt-1">GPT-4o가 Art. No. 위치를 감지합니다. 30초 정도 걸릴 수 있습니다.</p>
+                    {/* File list */}
+                    {items.map((it, i) => (
+                        <div key={i} className="border border-slate-200 rounded-xl p-3 space-y-2">
+                            <div className="flex items-center gap-2">
+                                {it.status === 'pending' && <FileImage className="w-4 h-4 text-slate-400 shrink-0" />}
+                                {it.status === 'uploading' && <Loader2 className="w-4 h-4 text-blue-500 animate-spin shrink-0" />}
+                                {it.status === 'done' && <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />}
+                                {it.status === 'error' && <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />}
+                                <span className="text-xs text-slate-400 truncate flex-1">{it.file.name}</span>
+                                {it.status === 'pending' && !uploading && (
+                                    <button onClick={() => removeItem(i)} className="text-slate-300 hover:text-red-400">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
                             </div>
-                        </div>
-                    )}
 
-                    {step === 'done' && (
-                        <div className="flex flex-col items-center py-10 gap-4">
-                            <div className="text-5xl">✅</div>
-                            <div className="text-center">
-                                <p className="font-bold text-slate-800">업로드 완료!</p>
-                                <p className="text-slate-500 mt-1">
-                                    <span className="font-bold text-blue-600">{detectedCount}개</span> Art. No.가 감지되었습니다.
-                                </p>
-                                <p className="text-xs text-slate-400 mt-1">도면 뷰어에서 정확도를 확인하고 조정할 수 있습니다.</p>
-                            </div>
+                            {it.status === 'error' && (
+                                <p className="text-xs text-red-500">{it.error}</p>
+                            )}
+
+                            {(it.status === 'pending' || it.status === 'uploading') && (
+                                <div className="space-y-2">
+                                    <input
+                                        value={it.name}
+                                        onChange={e => updateItem(i, { name: e.target.value })}
+                                        placeholder="도면 이름"
+                                        disabled={uploading}
+                                        className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                                    />
+                                    <div className="flex gap-2">
+                                        <input
+                                            value={it.drawingNo}
+                                            onChange={e => updateItem(i, { drawingNo: e.target.value })}
+                                            placeholder="도면 번호 (선택)"
+                                            disabled={uploading}
+                                            className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                                        />
+                                        <select
+                                            value={it.category}
+                                            onChange={e => updateItem(i, { category: e.target.value })}
+                                            disabled={uploading}
+                                            className="border border-slate-200 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50"
+                                        >
+                                            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+
+                    {allDone && doneCount > 0 && (
+                        <div className="flex flex-col items-center py-6 gap-3">
+                            <div className="text-4xl">✅</div>
+                            <p className="font-bold text-slate-800">{doneCount}장 업로드 완료!</p>
                             <button
-                                onClick={() => { onUploaded(); onClose() }}
+                                onClick={onClose}
                                 className="px-8 py-2.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors"
                             >
                                 확인
                             </button>
                         </div>
                     )}
-
-                    {step === 'form' && (
-                        <>
-                            {/* Image drop zone */}
-                            <div
-                                onClick={() => fileRef.current?.click()}
-                                className="relative border-2 border-dashed border-slate-200 rounded-xl overflow-hidden cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
-                                style={{ minHeight: '160px' }}
-                            >
-                                {preview ? (
-                                    <img src={preview} alt="미리보기" className="w-full max-h-48 object-contain" />
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-400">
-                                        <Upload className="w-8 h-8" />
-                                        <p className="text-sm font-medium">클릭하여 도면 이미지 선택</p>
-                                        <p className="text-xs">JPG · PNG · WEBP · 최대 15MB</p>
-                                        <p className="text-xs text-slate-300">(PDF는 이미지로 내보내기 후 업로드)</p>
-                                    </div>
-                                )}
-                                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileSelect} />
-                            </div>
-
-                            {/* Metadata */}
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="text-xs font-semibold text-slate-500 mb-1 block">도면 이름 *</label>
-                                    <input
-                                        value={name}
-                                        onChange={e => setName(e.target.value)}
-                                        placeholder="예: Clubliner Plus - 구동부"
-                                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                </div>
-                                <div className="flex gap-3">
-                                    <div className="flex-1">
-                                        <label className="text-xs font-semibold text-slate-500 mb-1 block">도면 번호 (선택)</label>
-                                        <input
-                                            value={drawingNo}
-                                            onChange={e => setDrawingNo(e.target.value)}
-                                            placeholder="예: 10003347"
-                                            className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-semibold text-slate-500 mb-1 block">카테고리</label>
-                                        <select
-                                            value={category}
-                                            onChange={e => setCategory(e.target.value)}
-                                            className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                        >
-                                            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={handleUpload}
-                                disabled={!file || !name.trim()}
-                                className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-40 transition-colors"
-                            >
-                                업로드 및 Art. No. 자동 감지
-                            </button>
-                        </>
-                    )}
                 </div>
+
+                {!allDone && items.length > 0 && (
+                    <div className="px-6 pb-6 shrink-0">
+                        <button
+                            onClick={handleUpload}
+                            disabled={uploading || pendingCount === 0}
+                            className="w-full py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-40 transition-colors flex items-center justify-center gap-2"
+                        >
+                            {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
+                            {uploading ? '업로드 중…' : `${pendingCount}장 업로드`}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     )
@@ -198,7 +222,6 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
 export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
     const [diagrams, setDiagrams] = useState(initial)
     const [showUpload, setShowUpload] = useState(false)
-    const [redetecting, setRedetecting] = useState<number | null>(null)
 
     async function refresh() {
         try {
@@ -214,27 +237,6 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
         setDiagrams(prev => prev.filter(d => d.id !== id))
     }
 
-    async function handleRedetect(id: number) {
-        if (!confirm('AI가 Art. No. 위치를 다시 감지합니다. 기존 위치 정보가 모두 교체됩니다. 계속할까요?')) return
-        setRedetecting(id)
-        try {
-            const res = await fetch(`/api/diagrams/${id}/redetect`, { method: 'POST' })
-            const json = await res.json()
-            if (res.ok) {
-                setDiagrams(prev => prev.map(d =>
-                    d.id === id ? { ...d, _count: { hotspots: json.detectedCount } } : d
-                ))
-                alert(`재탐지 완료: ${json.detectedCount}개 Art. No. 감지됨`)
-            } else {
-                alert(json.error ?? '재탐지에 실패했습니다.')
-            }
-        } catch {
-            alert('네트워크 오류가 발생했습니다.')
-        } finally {
-            setRedetecting(null)
-        }
-    }
-
     const fmt = new Intl.DateTimeFormat('ko', { year: 'numeric', month: 'short', day: 'numeric' })
 
     return (
@@ -245,7 +247,7 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                         <BookOpen className="w-6 h-6 text-blue-600" />
                         부품 도면
                     </h1>
-                    <p className="text-sm text-slate-500 mt-1">도면에 마우스를 올려 Art. No.를 확인하세요</p>
+                    <p className="text-sm text-slate-500 mt-1">도면을 클릭하면 확대해서 볼 수 있습니다</p>
                 </div>
                 <button
                     onClick={() => setShowUpload(true)}
@@ -283,25 +285,12 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                                     <Link href={`/diagrams/${d.id}`} className="font-semibold text-slate-800 hover:text-blue-600 transition-colors leading-tight">
                                         {d.name}
                                     </Link>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                        <button
-                                            onClick={() => handleRedetect(d.id)}
-                                            disabled={redetecting === d.id}
-                                            title="AI 재탐지"
-                                            className="text-slate-300 hover:text-blue-400 transition-colors mt-0.5 disabled:cursor-not-allowed"
-                                        >
-                                            {redetecting === d.id
-                                                ? <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
-                                                : <RefreshCw className="w-4 h-4" />
-                                            }
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(d.id, d.name)}
-                                            className="text-slate-300 hover:text-red-400 transition-colors mt-0.5"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
+                                    <button
+                                        onClick={() => handleDelete(d.id, d.name)}
+                                        className="text-slate-300 hover:text-red-400 transition-colors mt-0.5 shrink-0"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-2 mt-2.5">
@@ -313,9 +302,6 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                                             <Tag className="w-3 h-3" />{d.drawingNo}
                                         </span>
                                     )}
-                                    <span className="flex items-center gap-1 text-xs text-slate-400">
-                                        <MapPin className="w-3 h-3" />{d._count.hotspots}개 Art. No.
-                                    </span>
                                     <span className="flex items-center gap-1 text-xs text-slate-400 ml-auto">
                                         <Calendar className="w-3 h-3" />
                                         {fmt.format(new Date(d.createdAt))}
