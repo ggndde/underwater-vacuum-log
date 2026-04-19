@@ -12,7 +12,6 @@ export async function GET(req: Request) {
   }
 
   try {
-    let syncedLogs = 0;
     let syncedDeliveries = 0;
     let updatedDeliveries = 0;
     let processedPostsCount = 0;
@@ -92,75 +91,46 @@ export async function GET(req: Request) {
                   // Parse comment with AI
                   const parsed = await parseComment(post.title || '', commentText, comment.createdTime || new Date().toISOString());
 
-                  if (parsed && parsed.customerName) {
-
-                    // 고객사 존재 여부 먼저 확인
-                    const customer = await prisma.customer.findFirst({
-                      where: { name: { contains: parsed.customerName } }
+                  if (parsed && parsed.customerName && parsed.isDelivery) {
+                    // 납품 일정 자동 생성
+                    const pendingDelivery = await prisma.delivery.findFirst({
+                      where: {
+                        destination: { contains: parsed.customerName },
+                        status: '예정'
+                      }
                     });
 
-                    // 1. 납품 일정: 고객사가 DB에 있을 때만 생성
-                    if (parsed.isDelivery && customer) {
-                      const pendingDelivery = await prisma.delivery.findFirst({
-                        where: {
-                          destination: { contains: parsed.customerName },
-                          status: '예정'
-                        }
-                      });
-
-                      let targetDate = new Date(comment.createdTime || Date.now());
-                      if (parsed.deliveryDate) {
-                        const parsedDate = new Date(parsed.deliveryDate);
-                        if (!isNaN(parsedDate.getTime())) {
-                          targetDate = parsedDate;
-                        }
-                      }
-
-                      if (pendingDelivery) {
-                        await prisma.delivery.update({
-                          where: { id: pendingDelivery.id },
-                          data: {
-                            date: targetDate,
-                            memo: pendingDelivery.memo ? `${pendingDelivery.memo}\n[추가] ${parsed.content}` : parsed.content
-                          }
-                        });
-                        updatedDeliveries++;
-                      } else {
-                        await prisma.delivery.create({
-                          data: {
-                            date: targetDate,
-                            productName: parsed.productName || '수중청소기',
-                            destination: parsed.customerName,
-                            memo: parsed.content,
-                            quantity: 1,
-                            performedBy: '자동연동(댓글)',
-                            status: '예정',
-                            source: 'naver_works'
-                          }
-                        });
-                        syncedDeliveries++;
+                    let targetDate = new Date(comment.createdTime || Date.now());
+                    if (parsed.deliveryDate) {
+                      const parsedDate = new Date(parsed.deliveryDate);
+                      if (!isNaN(parsedDate.getTime())) {
+                        targetDate = parsedDate;
                       }
                     }
 
-                    // 2. 서비스 로그: 고객사 + 기기 모두 있을 때만 생성
-                    if (customer) {
-                      const firstMachine = await prisma.machine.findFirst({
-                        where: { customerId: customer.id }
+                    if (pendingDelivery) {
+                      await prisma.delivery.update({
+                        where: { id: pendingDelivery.id },
+                        data: {
+                          date: targetDate,
+                          memo: pendingDelivery.memo ? `${pendingDelivery.memo}\n[추가] ${parsed.content}` : parsed.content
+                        }
                       });
-
-                      if (firstMachine) {
-                        await prisma.serviceLog.create({
-                          data: {
-                            date: new Date(comment.createdTime || Date.now()),
-                            type: parsed.isDelivery ? 'DELIVERY' : 'VISIT',
-                            body: parsed.content,
-                            machineId: firstMachine.id,
-                            externalId: commentId,
-                            source: 'naver_works'
-                          }
-                        });
-                        syncedLogs++;
-                      }
+                      updatedDeliveries++;
+                    } else {
+                      await prisma.delivery.create({
+                        data: {
+                          date: targetDate,
+                          productName: parsed.productName || '수중청소기',
+                          destination: parsed.customerName,
+                          memo: parsed.content,
+                          quantity: 1,
+                          performedBy: '자동연동(댓글)',
+                          status: '예정',
+                          source: 'naver_works'
+                        }
+                      });
+                      syncedDeliveries++;
                     }
                   }
                 } // end comments loop
@@ -185,11 +155,10 @@ export async function GET(req: Request) {
       } // end boards loop
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Sync completed', 
+    return NextResponse.json({
+      success: true,
+      message: 'Sync completed',
       processedPostsCount,
-      syncedLogs, 
       syncedDeliveries,
       updatedDeliveries
     });
