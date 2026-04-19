@@ -47,7 +47,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     return NextResponse.json({ success: true })
 }
 
-// ── PATCH: update / add hotspots (manual correction) ─────────────────────────
+// ── PATCH: update metadata (name, drawingNo, category) or hotspots ───────────
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.name) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
@@ -55,9 +55,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const id = parseInt(params.id)
     if (isNaN(id)) return NextResponse.json({ error: '잘못된 ID입니다.' }, { status: 400 })
 
-    const { hotspots } = await req.json()
+    const body = await req.json()
 
-    // Replace all hotspots
+    // Metadata update
+    if (body.name !== undefined || body.drawingNo !== undefined || body.category !== undefined) {
+        const data: Record<string, string | null> = {}
+        if (body.name !== undefined) data.name = String(body.name).trim()
+        if (body.drawingNo !== undefined) data.drawingNo = body.drawingNo ? String(body.drawingNo).trim() : null
+        if (body.category !== undefined) data.category = String(body.category)
+        await (prisma as any).diagramSheet.update({ where: { id }, data })
+        return NextResponse.json({ success: true })
+    }
+
+    // Hotspot replacement
+    const { hotspots } = body
     await (prisma as any).diagramHotspot.deleteMany({ where: { diagramId: id } })
     if (Array.isArray(hotspots) && hotspots.length > 0) {
         await (prisma as any).diagramHotspot.createMany({
