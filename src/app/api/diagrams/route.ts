@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
     // Apply EXIF auto-rotation and normalize to PNG
-    let finalMimeType = 'image/png'
+    const finalMimeType = 'image/png'
     let buffer: Buffer = Buffer.from(
         await sharp(Buffer.from(await file.arrayBuffer())).rotate().png().toBuffer()
     )
