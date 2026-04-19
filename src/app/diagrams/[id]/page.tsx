@@ -1,6 +1,5 @@
 export const dynamic = 'force-dynamic'
 import { prisma } from '@/lib/prisma'
-import type { Part } from '@prisma/client'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft, Tag } from 'lucide-react'
@@ -12,29 +11,9 @@ export default async function DiagramDetailPage({ params }: { params: { id: stri
 
     const diagram = await (prisma as any).diagramSheet.findUnique({
         where: { id },
-        include: { hotspots: true },
+        select: { id: true, name: true, drawingNo: true, category: true },
     })
     if (!diagram) notFound()
-
-    // Enrich hotspots with part data
-    const articleNos = Array.from(new Set((diagram.hotspots as any[]).map((h: any) => h.articleNo))) as string[]
-    const parts = articleNos.length > 0
-        ? await prisma.part.findMany({ where: { articleNo: { in: articleNos } } })
-        : []
-    const partMap = new Map<string, Part>(parts.map((p: Part) => [p.articleNo, p]))
-
-    const enriched = {
-        ...diagram,
-        imageData: undefined, // don't pass to client (served via /api/diagrams/[id]/image)
-        hotspots: (diagram.hotspots as any[]).map((h: any) => ({
-            id: h.id,
-            articleNo: h.articleNo,
-            x: h.x,
-            y: h.y,
-            label: h.label,
-            part: partMap.get(h.articleNo) ?? null,
-        })),
-    }
 
     return (
         <div className="flex flex-col h-screen">
@@ -55,7 +34,7 @@ export default async function DiagramDetailPage({ params }: { params: { id: stri
 
             {/* Viewer fills remaining space */}
             <div className="flex-1 overflow-hidden">
-                <DiagramViewer diagram={enriched} />
+                <DiagramViewer diagram={diagram} />
             </div>
         </div>
     )
