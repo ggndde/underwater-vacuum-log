@@ -25,6 +25,10 @@ export async function GET(request: Request) {
 
     try {
         const items = await fetchConstructionBids(startDate, endDate);
+        if (items.length > 0) {
+            console.log('[pools] sample bidNtceUrl:', items[0].bidNtceUrl);
+            console.log('[pools] sample bidNtceNo:', items[0].bidNtceNo, 'bidNtceOrd:', items[0].bidNtceOrd);
+        }
         return NextResponse.json({ count: items.length, items });
     } catch (error) {
         console.error('Error in pools API:', error);
