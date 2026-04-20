@@ -38,12 +38,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         await sharp(Buffer.from(base64Data, 'base64')).rotate(degrees).png().toBuffer()
     )
     const newDataUrl = `data:image/png;base64,${rotated.toString('base64')}`
-    const thumbnailData = await makeThumbnail(rotated)
 
+    // imageData는 반드시 저장 (핵심 데이터)
     await (prisma as any).diagramSheet.update({
         where: { id },
-        data: { imageData: newDataUrl, thumbnailData, mimeType: 'image/png' },
+        data: { imageData: newDataUrl, mimeType: 'image/png' },
     })
+
+    // thumbnailData는 실패해도 무방 (컬럼 미생성 환경 호환)
+    try {
+        const thumbnailData = await makeThumbnail(rotated)
+        await (prisma as any).diagramSheet.update({
+            where: { id },
+            data: { thumbnailData },
+        })
+    } catch { /* thumbnailData 컬럼 없으면 무시 */ }
 
     return NextResponse.json({ ok: true })
 }
