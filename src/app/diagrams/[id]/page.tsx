@@ -9,10 +9,16 @@ export default async function DiagramDetailPage({ params }: { params: { id: stri
     const id = parseInt(params.id)
     if (isNaN(id)) notFound()
 
-    const diagram = await (prisma as any).diagramSheet.findUnique({
-        where: { id },
-        select: { id: true, name: true, drawingNo: true, category: true },
-    })
+    const [diagram, allDiagrams] = await Promise.all([
+        (prisma as any).diagramSheet.findUnique({
+            where: { id },
+            select: { id: true, name: true, drawingNo: true, category: true },
+        }),
+        (prisma as any).diagramSheet.findMany({
+            orderBy: { createdAt: 'asc' },
+            select: { id: true, name: true, category: true, thumbnailData: true },
+        }),
+    ])
     if (!diagram) notFound()
 
     return (
@@ -34,7 +40,7 @@ export default async function DiagramDetailPage({ params }: { params: { id: stri
 
             {/* Viewer fills remaining space */}
             <div className="flex-1 min-h-0 overflow-hidden">
-                <DiagramViewer diagram={diagram} />
+                <DiagramViewer diagram={diagram} allDiagrams={allDiagrams} />
             </div>
         </div>
     )
