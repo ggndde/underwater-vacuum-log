@@ -17,7 +17,11 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
     const [offset, setOffset] = useState({ x: 0, y: 0 })
     const [isDragging, setIsDragging] = useState(false)
     const [dragStart, setDragStart] = useState({ x: 0, y: 0, ox: 0, oy: 0 })
-    const [imgCacheBust, setImgCacheBust] = useState(0)
+    const LS_KEY = `diagram_v_${diagram.id}`
+    const [imgCacheBust, setImgCacheBust] = useState<number>(() => {
+        if (typeof window === 'undefined') return 0
+        return parseInt(localStorage.getItem(LS_KEY) ?? '0', 10)
+    })
     const [rotating, setRotating] = useState(false)
 
     // ── Manual rotation ───────────────────────────────────────────────────────
@@ -29,11 +33,13 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ degrees }),
             })
-            setImgCacheBust(n => n + 1)
+            const newV = Date.now()
+            localStorage.setItem(LS_KEY, String(newV))
+            setImgCacheBust(newV)
         } finally {
             setRotating(false)
         }
-    }, [diagram.id])
+    }, [diagram.id, LS_KEY])
 
     // ── Zoom ─────────────────────────────────────────────────────────────────
     const zoom = useCallback((factor: number) => {

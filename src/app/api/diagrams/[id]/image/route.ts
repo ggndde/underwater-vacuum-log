@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     return new NextResponse(imageBuffer, {
         headers: {
             'Content-Type': diagram.mimeType,
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Cache-Control': 'private, max-age=3600',
         },
     })
 }

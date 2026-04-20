@@ -369,6 +369,8 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                                     <img
                                         src={`/api/diagrams/${d.id}/image`}
                                         alt={d.name}
+                                        loading="lazy"
+                                        decoding="async"
                                         className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                                     />
                                 </div>
