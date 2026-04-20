@@ -225,3 +225,12 @@ model DiagramHotspot {
   y         Float        // position % from top  (0–100)
   label     String?      // part description detected near the number
 }
+
+// ─── Parts Catalog (searchable parts reference list) ─────────────────────────
+
+model PartCatalog {
+  id          Int      @id @default(autoincrement())
+  article     String   @unique
+  description String
+  createdAt   DateTime @default(now())
+}
