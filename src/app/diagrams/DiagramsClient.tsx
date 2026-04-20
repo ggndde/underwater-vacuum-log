@@ -360,12 +360,12 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                     <p className="text-sm mt-1">위 버튼으로 도면 이미지를 추가하세요</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                     {filtered.map(d => (
-                        <div key={d.id} className="group bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
+                        <div key={d.id} className="group bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-blue-300 transition-all">
                             {/* Thumbnail */}
                             <Link href={`/diagrams/${d.id}`}>
-                                <div className="relative bg-slate-50 h-40 overflow-hidden">
+                                <div className="relative bg-slate-50 h-64 overflow-hidden">
                                     <img
                                         src={`/api/diagrams/${d.id}/image`}
                                         alt={d.name}
