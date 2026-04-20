@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { ZoomIn, ZoomOut, RotateCcw, RotateCw, Loader2, Tag, X, Plus, Search, Sparkles, BookOpen } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+
 
 type Diagram = {
     id: number
@@ -26,43 +26,70 @@ const CATEGORY_COLORS: Record<string, string> = {
     '공용': 'bg-slate-100 text-slate-500',
 }
 
+const CAT_TABS = ['전체', 'CP', 'PP', 'NV3', '공용'] as const
+const LS_CAT_KEY = 'diagram_nav_cat'
+const LS_SEARCH_KEY = 'diagram_nav_search'
+
 // ── Right Diagram Navigator ───────────────────────────────────────────────────
 function DiagramNavigator({ currentId, diagrams }: { currentId: number; diagrams: DiagramListItem[] }) {
-    const [filter, setFilter] = useState('')
-    const router = useRouter()
+    const [search, setSearch] = useState(() =>
+        typeof window !== 'undefined' ? (localStorage.getItem(LS_SEARCH_KEY) ?? '') : ''
+    )
+    const [cat, setCat] = useState<string>(() =>
+        typeof window !== 'undefined' ? (localStorage.getItem(LS_CAT_KEY) ?? '전체') : '전체'
+    )
     const activeRef = useRef<HTMLAnchorElement>(null)
 
-    useEffect(() => {
-        activeRef.current?.scrollIntoView({ block: 'nearest' })
-    }, [])
+    useEffect(() => { localStorage.setItem(LS_CAT_KEY, cat) }, [cat])
+    useEffect(() => { localStorage.setItem(LS_SEARCH_KEY, search) }, [search])
+    useEffect(() => { activeRef.current?.scrollIntoView({ block: 'nearest' }) }, [])
 
-    const filtered = filter.trim()
-        ? diagrams.filter(d =>
-            d.name.toLowerCase().includes(filter.trim().toLowerCase()) ||
-            d.category.toLowerCase().includes(filter.trim().toLowerCase())
-        )
-        : diagrams
+    const filtered = diagrams.filter(d => {
+        const matchCat = cat === '전체' || d.category === cat
+        const q = search.trim().toLowerCase()
+        const matchSearch = !q || d.name.toLowerCase().includes(q)
+        return matchCat && matchSearch
+    })
 
     return (
-        <div className="flex flex-col h-full bg-white border-l border-slate-200 w-64 shrink-0">
+        <div className="flex flex-col h-full bg-white border-l border-slate-200 w-80 shrink-0">
             {/* Header */}
             <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
-                <p className="text-sm font-semibold text-slate-600 flex items-center gap-2 mb-2.5">
+                <p className="text-sm font-semibold text-slate-600 flex items-center gap-2 mb-3">
                     <BookOpen className="w-4 h-4 text-blue-500" />
                     도면 목록
-                    <span className="text-xs font-normal text-slate-400">({diagrams.length})</span>
+                    <span className="text-xs font-normal text-slate-400">({filtered.length}/{diagrams.length})</span>
                 </p>
+
+                {/* Category filter tabs */}
+                <div className="flex gap-1 mb-2.5 flex-wrap">
+                    {CAT_TABS.map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setCat(tab)}
+                            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+                                cat === tab
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            }`}
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Search */}
                 <div className="relative">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                     <input
                         type="text"
-                        value={filter}
-                        onChange={e => setFilter(e.target.value)}
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
                         placeholder="도면명 검색"
                         className="w-full pl-8 pr-6 py-2 text-sm rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-400"
                     />
-                    {filter && (
-                        <button onClick={() => setFilter('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
+                    {search && (
+                        <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
                             <X className="w-3.5 h-3.5" />
                         </button>
                     )}
@@ -71,6 +98,9 @@ function DiagramNavigator({ currentId, diagrams }: { currentId: number; diagrams
 
             {/* List */}
             <div className="flex-1 overflow-y-auto">
+                {filtered.length === 0 && (
+                    <p className="text-sm text-slate-400 text-center py-8">검색 결과 없음</p>
+                )}
                 {filtered.map(d => {
                     const isActive = d.id === currentId
                     return (
@@ -78,34 +108,31 @@ function DiagramNavigator({ currentId, diagrams }: { currentId: number; diagrams
                             key={d.id}
                             href={`/diagrams/${d.id}`}
                             ref={isActive ? (activeRef as React.RefObject<HTMLAnchorElement>) : undefined}
-                            className={`flex items-center gap-3 px-3 py-2.5 border-b border-slate-100 transition-colors ${
+                            className={`flex items-center gap-3 px-3 py-3 border-b border-slate-100 transition-colors ${
                                 isActive
                                     ? 'bg-blue-50 border-l-[3px] border-l-blue-500'
                                     : 'hover:bg-slate-50'
                             }`}
                         >
                             {/* Thumbnail */}
-                            <div className="w-14 h-14 shrink-0 rounded-md overflow-hidden bg-slate-100 flex items-center justify-center">
+                            <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center shadow-sm">
                                 {d.thumbnailData
                                     ? <img src={d.thumbnailData} alt="" className="w-full h-full object-cover" />
-                                    : <BookOpen className="w-5 h-5 text-slate-300" />
+                                    : <BookOpen className="w-6 h-6 text-slate-300" />
                                 }
                             </div>
                             {/* Info */}
                             <div className="flex-1 min-w-0">
-                                <p className={`text-sm font-medium leading-snug line-clamp-2 ${isActive ? 'text-blue-700' : 'text-slate-700'}`}>
+                                <p className={`text-sm font-semibold leading-snug line-clamp-3 ${isActive ? 'text-blue-700' : 'text-slate-800'}`}>
                                     {d.name}
                                 </p>
-                                <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-xs font-medium ${CATEGORY_COLORS[d.category] ?? 'bg-slate-100 text-slate-500'}`}>
+                                <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${CATEGORY_COLORS[d.category] ?? 'bg-slate-100 text-slate-500'}`}>
                                     {d.category}
                                 </span>
                             </div>
                         </Link>
                     )
                 })}
-                {filtered.length === 0 && (
-                    <p className="text-sm text-slate-400 text-center py-6">검색 결과 없음</p>
-                )}
             </div>
         </div>
     )
@@ -201,7 +228,7 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
     }
 
     return (
-        <div className="flex flex-col h-full bg-white border-r border-slate-200 w-72 shrink-0">
+        <div className="flex flex-col h-full bg-white border-r border-slate-200 w-80 shrink-0">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
                 <span className="text-sm font-semibold text-slate-600 flex items-center gap-2">
