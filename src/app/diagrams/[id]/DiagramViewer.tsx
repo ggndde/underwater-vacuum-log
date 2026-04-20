@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ZoomIn, ZoomOut, RotateCcw, RotateCw, Loader2, Tag, X, Plus, Search } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, RotateCw, Loader2, Tag, X, Plus, Search, Sparkles } from 'lucide-react'
 import Link from 'next/link'
 
 type Diagram = {
@@ -23,6 +23,8 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
     const [hotspots, setHotspots] = useState<Hotspot[]>([])
     const [input, setInput] = useState('')
     const [adding, setAdding] = useState(false)
+    const [detecting, setDetecting] = useState(false)
+    const [detectResult, setDetectResult] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [showInput, setShowInput] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
@@ -68,6 +70,27 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
         } catch {}
     }
 
+    const handleAutoDetect = async () => {
+        setDetecting(true)
+        setDetectResult(null)
+        setError(null)
+        try {
+            const res = await fetch(`/api/diagrams/${diagramId}/hotspots/auto-detect`, { method: 'POST' })
+            const data = await res.json()
+            if (!res.ok) { setError(data.error ?? '오류'); return }
+            if (data.hotspots) setHotspots(data.hotspots)
+            if (data.added === 0) {
+                setDetectResult('새로 추가된 번호 없음 (이미 모두 등록됨)')
+            } else {
+                setDetectResult(`${data.added}개 번호 자동 등록 완료 (중복 ${data.skipped}개 제외)`)
+            }
+        } catch {
+            setError('네트워크 오류')
+        } finally {
+            setDetecting(false)
+        }
+    }
+
     return (
         <div className="border-t border-slate-200 bg-white">
             <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
@@ -78,14 +101,30 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
                         <span className="bg-violet-100 text-violet-600 rounded-full px-1.5 py-0.5 text-[10px] font-bold">{hotspots.length}</span>
                     )}
                 </span>
-                <button
-                    onClick={() => { setShowInput(v => !v); setError(null) }}
-                    className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-700 font-medium"
-                >
-                    <Plus className="w-3.5 h-3.5" />
-                    추가
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleAutoDetect}
+                        disabled={detecting}
+                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-medium disabled:opacity-50"
+                        title="AI로 도면에서 6자리 부품 번호를 자동 감지"
+                    >
+                        {detecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        {detecting ? '감지 중...' : 'AI 자동 감지'}
+                    </button>
+                    <button
+                        onClick={() => { setShowInput(v => !v); setError(null) }}
+                        className="flex items-center gap-1 text-xs text-violet-600 hover:text-violet-700 font-medium"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                        직접 추가
+                    </button>
+                </div>
             </div>
+            {(detectResult || (error && !showInput)) && (
+                <div className={`px-3 py-1.5 text-xs border-b border-slate-100 ${detectResult ? 'text-green-600 bg-green-50' : 'text-red-500 bg-red-50'}`}>
+                    {detectResult ?? error}
+                </div>
+            )}
 
             {showInput && (
                 <div className="px-3 py-2 border-b border-slate-100 bg-violet-50">
