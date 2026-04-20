@@ -205,14 +205,15 @@ model NaverWorksMeta {
 // ─── Diagram (Parts Drawing) ─────────────────────────────────────────────────
 
 model DiagramSheet {
-  id        Int              @id @default(autoincrement())
-  name      String           // e.g. "Clubliner Plus - 구동부"
-  drawingNo String?          // e.g. "10003347"
-  category  String           @default("공용") // CP | PP | NV3 | 공용
-  imageData String           // base64-encoded image data URL
-  mimeType  String           @default("image/jpeg")
-  hotspots  DiagramHotspot[]
-  createdAt DateTime         @default(now())
+  id            Int              @id @default(autoincrement())
+  name          String
+  drawingNo     String?
+  category      String           @default("공용") // CP | PP | NV3 | 공용
+  imageData     String           // base64-encoded full image data URL
+  thumbnailData String?          // small JPEG (~400px) for list view
+  mimeType      String           @default("image/jpeg")
+  hotspots      DiagramHotspot[]
+  createdAt     DateTime         @default(now())
 }
 
 model DiagramHotspot {

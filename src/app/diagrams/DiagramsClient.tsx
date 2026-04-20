@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import {
     Upload, X, Loader2, FileImage, Trash2, AlertCircle,
@@ -27,6 +27,7 @@ type DiagramMeta = {
     category: string
     mimeType: string
     createdAt: string
+    thumbnailData: string | null
     _count: { hotspots: number }
 }
 
@@ -283,6 +284,42 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
     const [diagrams, setDiagrams] = useState(initial)
     const [showUpload, setShowUpload] = useState(false)
     const [activeTab, setActiveTab] = useState<FilterTab>('전체')
+    const [thumbGenProgress, setThumbGenProgress] = useState<string | null>(null)
+
+    // 썸네일이 없는 도면이 있으면 백그라운드에서 자동으로 생성
+    useEffect(() => {
+        const hasMissing = diagrams.some(d => d.thumbnailData === null)
+        if (!hasMissing) return
+
+        let cancelled = false
+
+        async function runMigration() {
+            setThumbGenProgress('썸네일 생성 중…')
+            while (!cancelled) {
+                try {
+                    const res = await fetch('/api/diagrams/generate-thumbnails', { method: 'POST' })
+                    if (!res.ok) break
+                    const json = await res.json()
+                    if (json.done) {
+                        setThumbGenProgress(null)
+                        // 썸네일이 생성되면 목록을 새로 불러옴
+                        const listRes = await fetch('/api/diagrams')
+                        const listJson = await listRes.json()
+                        if (listRes.ok && !cancelled) setDiagrams(listJson.diagrams)
+                        break
+                    }
+                    setThumbGenProgress(`썸네일 생성 중… (${json.remaining}장 남음)`)
+                } catch {
+                    break
+                }
+            }
+            if (cancelled) setThumbGenProgress(null)
+        }
+
+        runMigration()
+        return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     async function refresh() {
         try {
@@ -303,9 +340,7 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
     }
 
     const filtered = activeTab === '전체' ? diagrams : diagrams.filter(d => d.category === activeTab)
-
     const countByCategory = (cat: Category) => diagrams.filter(d => d.category === cat).length
-
     const fmt = new Intl.DateTimeFormat('ko', { year: 'numeric', month: 'short', day: 'numeric' })
 
     return (
@@ -327,7 +362,15 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                 </button>
             </div>
 
-            {/* Category filter tabs */}
+            {/* 썸네일 생성 중 배너 */}
+            {thumbGenProgress && (
+                <div className="flex items-center gap-2 px-4 py-2.5 mb-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    {thumbGenProgress}
+                </div>
+            )}
+
+            {/* 카테고리 필터 탭 */}
             <div className="flex gap-1.5 mb-5 flex-wrap">
                 {FILTER_TABS.map(tab => {
                     const count = tab === '전체' ? diagrams.length : countByCategory(tab as Category)
@@ -363,11 +406,11 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                     {filtered.map(d => (
                         <div key={d.id} className="group bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-blue-300 transition-all">
-                            {/* Thumbnail */}
+                            {/* 썸네일 */}
                             <Link href={`/diagrams/${d.id}`}>
                                 <div className="relative bg-slate-50 h-64 overflow-hidden">
                                     <img
-                                        src={`/api/diagrams/${d.id}/image`}
+                                        src={d.thumbnailData ?? `/api/diagrams/${d.id}/image`}
                                         alt={d.name}
                                         loading="lazy"
                                         decoding="async"
@@ -376,7 +419,7 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                                 </div>
                             </Link>
 
-                            {/* Info */}
+                            {/* 정보 */}
                             <div className="p-4">
                                 <div className="flex items-start justify-between gap-2">
                                     <NameEditor id={d.id} name={d.name} onSaved={name => handleRename(d.id, name)} />

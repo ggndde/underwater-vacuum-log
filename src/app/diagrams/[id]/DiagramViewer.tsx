@@ -17,10 +17,10 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
     const [offset, setOffset] = useState({ x: 0, y: 0 })
     const [isDragging, setIsDragging] = useState(false)
     const [dragStart, setDragStart] = useState({ x: 0, y: 0, ox: 0, oy: 0 })
-    const LS_KEY = `diagram_v_${diagram.id}`
+    const lsKey = `diagram_v_${diagram.id}`
     const [imgCacheBust, setImgCacheBust] = useState<number>(() => {
         if (typeof window === 'undefined') return 0
-        return parseInt(localStorage.getItem(LS_KEY) ?? '0', 10)
+        return parseInt(localStorage.getItem(`diagram_v_${diagram.id}`) ?? '0', 10)
     })
     const [rotating, setRotating] = useState(false)
 
@@ -28,18 +28,20 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
     const handleRotate = useCallback(async (degrees: 90 | 270) => {
         setRotating(true)
         try {
-            await fetch(`/api/diagrams/${diagram.id}/rotate`, {
+            const res = await fetch(`/api/diagrams/${diagram.id}/rotate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ degrees }),
             })
-            const newV = Date.now()
-            localStorage.setItem(LS_KEY, String(newV))
-            setImgCacheBust(newV)
+            if (res.ok) {
+                const newV = Date.now()
+                localStorage.setItem(lsKey, String(newV))
+                setImgCacheBust(newV)
+            }
         } finally {
             setRotating(false)
         }
-    }, [diagram.id, LS_KEY])
+    }, [diagram.id])
 
     // ── Zoom ─────────────────────────────────────────────────────────────────
     const zoom = useCallback((factor: number) => {

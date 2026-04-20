@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
         select: {
             id: true, name: true, drawingNo: true, category: true,
-            mimeType: true, createdAt: true,
+            mimeType: true, createdAt: true, thumbnailData: true,
             _count: { select: { hotspots: true } },
         },
     })
@@ -39,6 +39,16 @@ Return ONLY valid JSON:
 {"correct": 1}
 
 Where the number is 1, 2, 3, or 4 corresponding to the image that is upright.`
+
+async function makeThumbnail(buffer: Buffer): Promise<string> {
+    const thumb = Buffer.from(
+        await sharp(buffer)
+            .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 55 })
+            .toBuffer()
+    )
+    return `data:image/jpeg;base64,${thumb.toString('base64')}`
+}
 
 async function detectOrientation(openai: OpenAI, buffer: Buffer): Promise<number> {
     try {
@@ -119,9 +129,10 @@ export async function POST(req: NextRequest) {
     }
 
     const dataUrl = `data:${finalMimeType};base64,${buffer.toString('base64')}`
+    const thumbnailData = await makeThumbnail(buffer)
 
     const diagram = await (prisma as any).diagramSheet.create({
-        data: { name, drawingNo, category, imageData: dataUrl, mimeType: finalMimeType },
+        data: { name, drawingNo, category, imageData: dataUrl, thumbnailData, mimeType: finalMimeType },
     })
 
     return NextResponse.json({ diagram }, { status: 201 })

@@ -7,7 +7,7 @@ export default async function DiagramsPage() {
         orderBy: { createdAt: 'desc' },
         select: {
             id: true, name: true, drawingNo: true, category: true,
-            mimeType: true, createdAt: true,
+            mimeType: true, createdAt: true, thumbnailData: true,
             _count: { select: { hotspots: true } },
         },
     })
