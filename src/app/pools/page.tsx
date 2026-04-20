@@ -122,8 +122,14 @@ export default function PoolsPage() {
     };
 
     const getBidUrl = (bid: BidItem) => {
-        if (bid.bidNtceUrl && bid.bidNtceUrl.startsWith('http')) return bid.bidNtceUrl;
-        return `https://www.g2b.go.kr/pb/cm/pmakg/bid/bidinf/retrieveBidCnstwkPblanc.do?bidno=${bid.bidNtceNo}&bidseq=${bid.bidNtceOrd}`;
+        const oldUrl = bid.bidNtceUrl;
+        const qs = `bidno=${bid.bidNtceNo}&bidseq=${bid.bidNtceOrd}`;
+        if (oldUrl && oldUrl.includes('retrieveBidCnstwkPblanc.do')) {
+            const rawQs = oldUrl.split('?')[1] ?? qs;
+            return `https://www.g2b.go.kr/ep/invitation/publish/bidPublishInfoDtl.do?${rawQs}`;
+        }
+        if (oldUrl && oldUrl.startsWith('http') && !oldUrl.includes('/pb/cm/pmakg/')) return oldUrl;
+        return `https://www.g2b.go.kr/ep/invitation/publish/bidPublishInfoDtl.do?${qs}`;
     };
 
     return (
