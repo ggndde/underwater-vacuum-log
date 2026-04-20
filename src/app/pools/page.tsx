@@ -123,7 +123,7 @@ export default function PoolsPage() {
 
     const getBidUrl = (bid: BidItem) => {
         if (bid.bidNtceUrl && bid.bidNtceUrl.startsWith('http')) return bid.bidNtceUrl;
-        return `https://www.g2b.go.kr/pb/cm/pmakg/bid/bidinf/retrieveBidPblanc.do?bidno=${bid.bidNtceNo}&bidseq=${bid.bidNtceOrd}`;
+        return `https://www.g2b.go.kr/pb/cm/pmakg/bid/bidinf/retrieveBidCnstwkPblanc.do?bidno=${bid.bidNtceNo}&bidseq=${bid.bidNtceOrd}`;
     };
 
     return (
