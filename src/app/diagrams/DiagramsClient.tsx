@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import {
     Upload, X, Loader2, FileImage, Trash2, AlertCircle,
-    Calendar, Tag, BookOpen, CheckCircle2, Pencil,
+    Calendar, Tag, BookOpen, CheckCircle2, Pencil, Search,
 } from 'lucide-react'
 
 const CATEGORIES = ['CP', 'PP', 'NV3', '공용'] as const
@@ -353,13 +353,22 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                     </h1>
                     <p className="text-sm text-slate-500 mt-1">도면을 클릭하면 확대해서 볼 수 있습니다</p>
                 </div>
-                <button
-                    onClick={() => setShowUpload(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm"
-                >
-                    <Upload className="w-4 h-4" />
-                    도면 추가
-                </button>
+                <div className="flex items-center gap-2">
+                    <Link
+                        href="/diagrams/parts"
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 text-sm font-bold hover:bg-violet-200 dark:hover:bg-violet-900/50 transition-colors"
+                    >
+                        <Search className="w-4 h-4" />
+                        부품 검색
+                    </Link>
+                    <button
+                        onClick={() => setShowUpload(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                        <Upload className="w-4 h-4" />
+                        도면 추가
+                    </button>
+                </div>
             </div>
 
             {/* 썸네일 생성 중 배너 */}
