@@ -16,7 +16,7 @@ export default async function DiagramDetailPage({ params }: { params: { id: stri
     if (!diagram) notFound()
 
     return (
-        <div className="flex flex-col h-screen">
+        <div className="fixed inset-x-0 bottom-0 flex flex-col bg-white" style={{ top: 'var(--nav-h, 49px)' }}>
             {/* Header */}
             <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
                 <Link href="/diagrams" className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 transition-colors">
@@ -33,7 +33,7 @@ export default async function DiagramDetailPage({ params }: { params: { id: stri
             </div>
 
             {/* Viewer fills remaining space */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
                 <DiagramViewer diagram={diagram} />
             </div>
         </div>

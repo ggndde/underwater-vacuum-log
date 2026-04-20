@@ -4,6 +4,7 @@ import "./globals.css"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { NavBar } from "@/app/NavBar"
+import { NavHeightSetter } from "@/app/NavHeightSetter"
 import { Providers } from "@/app/Providers"
 import { ThemeProvider } from "@/app/ThemeProvider"
 import NextTopLoader from 'nextjs-toploader';
@@ -35,6 +36,7 @@ export default async function RootLayout({
                 <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
                     <Providers>
                         {userName && <NavBar userName={userName} />}
+                        {userName && <NavHeightSetter />}
                         <main className="min-h-screen border-box text-inherit bg-inherit pb-16 sm:pb-0">
                             {children}
                         </main>
