@@ -21,6 +21,7 @@ type Hotspot = {
 // ── Parts Panel ───────────────────────────────────────────────────────────────
 function PartsPanel({ diagramId }: { diagramId: number }) {
     const [hotspots, setHotspots] = useState<Hotspot[]>([])
+    const [filter, setFilter] = useState('')
     const [input, setInput] = useState('')
     const [adding, setAdding] = useState(false)
     const [detecting, setDetecting] = useState(false)
@@ -28,6 +29,14 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
     const [error, setError] = useState<string | null>(null)
     const [showInput, setShowInput] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
+    const filterRef = useRef<HTMLInputElement>(null)
+
+    const filtered = filter.trim()
+        ? hotspots.filter(h =>
+            h.articleNo.includes(filter.trim()) ||
+            (h.description ?? h.label ?? '').toLowerCase().includes(filter.trim().toLowerCase())
+        )
+        : hotspots
 
     useEffect(() => {
         fetch(`/api/diagrams/${diagramId}/hotspots`)
@@ -104,6 +113,26 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
                 </span>
             </div>
 
+            {/* Search filter */}
+            <div className="px-2 py-2 border-b border-slate-100">
+                <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+                    <input
+                        ref={filterRef}
+                        type="text"
+                        value={filter}
+                        onChange={e => setFilter(e.target.value)}
+                        placeholder="번호 또는 부품명 검색"
+                        className="w-full pl-6 pr-6 py-1.5 text-xs rounded-md border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-violet-400 focus:bg-white"
+                    />
+                    {filter && (
+                        <button onClick={() => setFilter('')} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
+                            <X className="w-3 h-3" />
+                        </button>
+                    )}
+                </div>
+            </div>
+
             {/* Action buttons */}
             <div className="flex gap-1 px-2 py-2 border-b border-slate-100">
                 <button
@@ -162,9 +191,13 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
                     <p className="text-[11px] text-slate-400 px-3 py-4 text-center leading-relaxed">
                         등록된 부품 번호가 없습니다.<br />AI 자동 감지를 눌러보세요.
                     </p>
+                ) : filtered.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 px-3 py-4 text-center">
+                        검색 결과가 없습니다
+                    </p>
                 ) : (
                     <div className="divide-y divide-slate-50">
-                        {hotspots.map(h => (
+                        {filtered.map(h => (
                             <div key={h.id} className="flex items-start gap-2 px-3 py-2.5 hover:bg-slate-50 group">
                                 <div className="flex-1 min-w-0">
                                     <Link
