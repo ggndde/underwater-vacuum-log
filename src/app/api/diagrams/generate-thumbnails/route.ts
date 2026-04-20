@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const missing = await (prisma as any).diagramSheet.findMany({
         where: { thumbnailData: null },
         select: { id: true, imageData: true },
-        take: 10, // process 10 at a time per call
+        take: 20,
     })
 
     if (missing.length === 0) {

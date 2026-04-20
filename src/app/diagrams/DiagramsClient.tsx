@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import {
     Upload, X, Loader2, FileImage, Trash2, AlertCircle,
-    Calendar, Tag, BookOpen, CheckCircle2,
+    Calendar, Tag, BookOpen, CheckCircle2, Pencil,
 } from 'lucide-react'
 
 const CATEGORIES = ['CP', 'PP', 'NV3', '공용'] as const
+type Category = typeof CATEGORIES[number]
 
 const CATEGORY_COLORS: Record<string, string> = {
     CP: 'bg-blue-100 text-blue-700',
@@ -15,6 +16,9 @@ const CATEGORY_COLORS: Record<string, string> = {
     NV3: 'bg-teal-100 text-teal-700',
     '공용': 'bg-slate-100 text-slate-600',
 }
+
+const FILTER_TABS = ['전체', ...CATEGORIES] as const
+type FilterTab = typeof FILTER_TABS[number]
 
 type DiagramMeta = {
     id: number
@@ -56,7 +60,6 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
                 status: 'pending' as const,
             }))
         ])
-        // reset input so same file can be added again if needed
         e.target.value = ''
     }
 
@@ -117,7 +120,6 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                    {/* Drop zone / add more */}
                     {!allDone && (
                         <div
                             onClick={() => fileRef.current?.click()}
@@ -137,7 +139,6 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
                         </div>
                     )}
 
-                    {/* File list */}
                     {items.map((it, i) => (
                         <div key={i} className="border border-slate-200 rounded-xl p-3 space-y-2">
                             <div className="flex items-center gap-2">
@@ -219,10 +220,106 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
     )
 }
 
+// ── Inline name editor ────────────────────────────────────────────────────────
+function NameEditor({ id, name, onSaved }: { id: number; name: string; onSaved: (name: string) => void }) {
+    const [editing, setEditing] = useState(false)
+    const [value, setValue] = useState(name)
+    const [saving, setSaving] = useState(false)
+
+    async function save() {
+        const trimmed = value.trim()
+        if (!trimmed || trimmed === name) { setEditing(false); setValue(name); return }
+        setSaving(true)
+        try {
+            await fetch(`/api/diagrams/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: trimmed }),
+            })
+            onSaved(trimmed)
+            setEditing(false)
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    if (editing) {
+        return (
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+                <input
+                    autoFocus
+                    value={value}
+                    onChange={e => setValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { setEditing(false); setValue(name) } }}
+                    className="flex-1 min-w-0 border border-blue-400 rounded-lg px-2 py-0.5 text-sm font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button onClick={save} disabled={saving} className="text-blue-500 hover:text-blue-700 disabled:opacity-40 shrink-0">
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                </button>
+                <button onClick={() => { setEditing(false); setValue(name) }} className="text-slate-300 hover:text-slate-500 shrink-0">
+                    <X className="w-3.5 h-3.5" />
+                </button>
+            </div>
+        )
+    }
+
+    return (
+        <div className="flex items-center gap-1 flex-1 min-w-0 group/name">
+            <Link href={`/diagrams/${id}`} className="font-semibold text-slate-800 hover:text-blue-600 transition-colors leading-tight truncate">
+                {name}
+            </Link>
+            <button
+                onClick={() => setEditing(true)}
+                className="text-slate-300 hover:text-slate-500 opacity-0 group-hover/name:opacity-100 transition-opacity shrink-0"
+                title="이름 변경"
+            >
+                <Pencil className="w-3 h-3" />
+            </button>
+        </div>
+    )
+}
+
 // ── Main List Component ───────────────────────────────────────────────────────
 export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
     const [diagrams, setDiagrams] = useState(initial)
     const [showUpload, setShowUpload] = useState(false)
+    const [activeTab, setActiveTab] = useState<FilterTab>('전체')
+    const [thumbGenProgress, setThumbGenProgress] = useState<string | null>(null)
+
+    // 썸네일이 없는 도면이 있으면 백그라운드에서 자동으로 생성
+    useEffect(() => {
+        const hasMissing = diagrams.some(d => d.thumbnailData === null)
+        if (!hasMissing) return
+
+        let cancelled = false
+
+        async function runMigration() {
+            setThumbGenProgress('썸네일 생성 중…')
+            while (!cancelled) {
+                try {
+                    const res = await fetch('/api/diagrams/generate-thumbnails', { method: 'POST' })
+                    if (!res.ok) break
+                    const json = await res.json()
+                    if (json.done) {
+                        setThumbGenProgress(null)
+                        // 썸네일이 생성되면 목록을 새로 불러옴
+                        const listRes = await fetch('/api/diagrams')
+                        const listJson = await listRes.json()
+                        if (listRes.ok && !cancelled) setDiagrams(listJson.diagrams)
+                        break
+                    }
+                    setThumbGenProgress(`썸네일 생성 중… (${json.remaining}장 남음)`)
+                } catch {
+                    break
+                }
+            }
+            if (cancelled) setThumbGenProgress(null)
+        }
+
+        runMigration()
+        return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     async function refresh() {
         try {
@@ -238,11 +335,17 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
         setDiagrams(prev => prev.filter(d => d.id !== id))
     }
 
+    function handleRename(id: number, newName: string) {
+        setDiagrams(prev => prev.map(d => d.id === id ? { ...d, name: newName } : d))
+    }
+
+    const filtered = activeTab === '전체' ? diagrams : diagrams.filter(d => d.category === activeTab)
+    const countByCategory = (cat: Category) => diagrams.filter(d => d.category === cat).length
     const fmt = new Intl.DateTimeFormat('ko', { year: 'numeric', month: 'short', day: 'numeric' })
 
     return (
         <>
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-5">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                         <BookOpen className="w-6 h-6 text-blue-600" />
@@ -259,33 +362,67 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                 </button>
             </div>
 
-            {diagrams.length === 0 ? (
+            {/* 썸네일 생성 중 배너 */}
+            {thumbGenProgress && (
+                <div className="flex items-center gap-2 px-4 py-2.5 mb-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    {thumbGenProgress}
+                </div>
+            )}
+
+            {/* 카테고리 필터 탭 */}
+            <div className="flex gap-1.5 mb-5 flex-wrap">
+                {FILTER_TABS.map(tab => {
+                    const count = tab === '전체' ? diagrams.length : countByCategory(tab as Category)
+                    const active = activeTab === tab
+                    return (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-colors ${
+                                active
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            }`}
+                        >
+                            {tab}
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                                {count}
+                            </span>
+                        </button>
+                    )
+                })}
+            </div>
+
+            {filtered.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">
                     <FileImage className="w-12 h-12 mb-3 opacity-30" />
-                    <p className="font-semibold">등록된 도면이 없습니다</p>
+                    <p className="font-semibold">
+                        {activeTab === '전체' ? '등록된 도면이 없습니다' : `${activeTab} 도면이 없습니다`}
+                    </p>
                     <p className="text-sm mt-1">위 버튼으로 도면 이미지를 추가하세요</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {diagrams.map(d => (
-                        <div key={d.id} className="group bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
-                            {/* Thumbnail */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {filtered.map(d => (
+                        <div key={d.id} className="group bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-blue-300 transition-all">
+                            {/* 썸네일 */}
                             <Link href={`/diagrams/${d.id}`}>
-                                <div className="relative bg-slate-50 h-40 overflow-hidden">
+                                <div className="relative bg-slate-50 h-64 overflow-hidden">
                                     <img
                                         src={d.thumbnailData ?? `/api/diagrams/${d.id}/image`}
                                         alt={d.name}
+                                        loading="lazy"
+                                        decoding="async"
                                         className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                                     />
                                 </div>
                             </Link>
 
-                            {/* Info */}
+                            {/* 정보 */}
                             <div className="p-4">
                                 <div className="flex items-start justify-between gap-2">
-                                    <Link href={`/diagrams/${d.id}`} className="font-semibold text-slate-800 hover:text-blue-600 transition-colors leading-tight">
-                                        {d.name}
-                                    </Link>
+                                    <NameEditor id={d.id} name={d.name} onSaved={name => handleRename(d.id, name)} />
                                     <button
                                         onClick={() => handleDelete(d.id, d.name)}
                                         className="text-slate-300 hover:text-red-400 transition-colors mt-0.5 shrink-0"
