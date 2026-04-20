@@ -31,7 +31,15 @@ const LS_CAT_KEY = 'diagram_nav_cat'
 const LS_SEARCH_KEY = 'diagram_nav_search'
 
 // ── Right Diagram Navigator ───────────────────────────────────────────────────
-function DiagramNavigator({ currentId, diagrams }: { currentId: number; diagrams: DiagramListItem[] }) {
+function DiagramNavigator({
+    currentId,
+    diagrams,
+    onClose,
+}: {
+    currentId: number
+    diagrams: DiagramListItem[]
+    onClose?: () => void
+}) {
     const [search, setSearch] = useState(() =>
         typeof window !== 'undefined' ? (localStorage.getItem(LS_SEARCH_KEY) ?? '') : ''
     )
@@ -52,14 +60,24 @@ function DiagramNavigator({ currentId, diagrams }: { currentId: number; diagrams
     })
 
     return (
-        <div className="flex flex-col h-full bg-white border-l border-slate-200 w-80 shrink-0">
+        <div className="flex flex-col h-full bg-white border-l border-slate-200 w-full shrink-0">
             {/* Header */}
             <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
-                <p className="text-sm font-semibold text-slate-600 flex items-center gap-2 mb-3">
-                    <BookOpen className="w-4 h-4 text-blue-500" />
-                    도면 목록
-                    <span className="text-xs font-normal text-slate-400">({filtered.length}/{diagrams.length})</span>
-                </p>
+                <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-semibold text-slate-600 flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-blue-500" />
+                        도면 목록
+                        <span className="text-xs font-normal text-slate-400">({filtered.length}/{diagrams.length})</span>
+                    </p>
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
 
                 {/* Category filter tabs */}
                 <div className="flex gap-1 mb-2.5 flex-wrap">
@@ -111,7 +129,7 @@ function DiagramNavigator({ currentId, diagrams }: { currentId: number; diagrams
                             className={`flex items-center gap-3 px-3 py-3 border-b border-slate-100 transition-colors ${
                                 isActive
                                     ? 'bg-blue-50 border-l-[3px] border-l-blue-500'
-                                    : 'hover:bg-slate-50'
+                                    : 'hover:bg-slate-50 active:bg-slate-100'
                             }`}
                         >
                             {/* Thumbnail */}
@@ -146,7 +164,13 @@ type Hotspot = {
 }
 
 // ── Parts Panel ───────────────────────────────────────────────────────────────
-function PartsPanel({ diagramId }: { diagramId: number }) {
+function PartsPanel({
+    diagramId,
+    onClose,
+}: {
+    diagramId: number
+    onClose?: () => void
+}) {
     const [hotspots, setHotspots] = useState<Hotspot[]>([])
     const [filter, setFilter] = useState('')
     const [input, setInput] = useState('')
@@ -156,7 +180,6 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
     const [error, setError] = useState<string | null>(null)
     const [showInput, setShowInput] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
-    const filterRef = useRef<HTMLInputElement>(null)
 
     const filtered = filter.trim()
         ? hotspots.filter(h =>
@@ -228,7 +251,7 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
     }
 
     return (
-        <div className="flex flex-col h-full bg-white border-r border-slate-200 w-80 shrink-0">
+        <div className="flex flex-col h-full bg-white border-r border-slate-200 w-full shrink-0">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-50">
                 <span className="text-sm font-semibold text-slate-600 flex items-center gap-2">
@@ -238,6 +261,14 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
                         <span className="bg-violet-100 text-violet-600 rounded-full px-2 py-0.5 text-xs font-bold">{hotspots.length}</span>
                     )}
                 </span>
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        className="md:hidden p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                )}
             </div>
 
             {/* Search filter */}
@@ -245,7 +276,6 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
                 <div className="relative">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                     <input
-                        ref={filterRef}
                         type="text"
                         value={filter}
                         onChange={e => setFilter(e.target.value)}
@@ -341,7 +371,7 @@ function PartsPanel({ diagramId }: { diagramId: number }) {
                                 </div>
                                 <button
                                     onClick={() => handleDelete(h.id)}
-                                    className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-400 transition-opacity shrink-0 mt-0.5"
+                                    className="text-slate-300 hover:text-red-400 shrink-0 mt-0.5 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                                 >
                                     <X className="w-3.5 h-3.5" />
                                 </button>
@@ -367,6 +397,8 @@ export function DiagramViewer({ diagram, allDiagrams }: { diagram: Diagram; allD
         return parseInt(localStorage.getItem(`diagram_v_${diagram.id}`) ?? '0', 10)
     })
     const [rotating, setRotating] = useState(false)
+    const [showParts, setShowParts] = useState(false)
+    const [showNav, setShowNav] = useState(false)
 
     // ── Manual rotation ───────────────────────────────────────────────────────
     const handleRotate = useCallback(async (degrees: 90 | 270) => {
@@ -473,7 +505,16 @@ export function DiagramViewer({ diagram, allDiagrams }: { diagram: Diagram; allD
     return (
         <div className="flex flex-col h-full">
             {/* ── Toolbar ── */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-slate-200 shrink-0">
+            <div className="flex items-center gap-1 px-2 sm:px-3 py-2 bg-white border-b border-slate-200 shrink-0">
+                {/* Mobile: toggle parts panel */}
+                <button
+                    onClick={() => { setShowParts(v => !v); setShowNav(false) }}
+                    title="부품 번호"
+                    className={`md:hidden p-2 rounded-lg active:bg-slate-200 transition-colors ${showParts ? 'bg-violet-100 text-violet-600' : 'hover:bg-slate-100 text-slate-600'}`}
+                >
+                    <Tag className="w-4 h-4" />
+                </button>
+
                 <div className="flex items-center gap-0.5 shrink-0 border-r border-slate-200 pr-2 mr-0.5">
                     <button onClick={() => handleRotate(270)} disabled={rotating} title="반시계 방향 90° 회전" className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-600 disabled:opacity-40">
                         <RotateCcw className="w-4 h-4" />
@@ -488,18 +529,47 @@ export function DiagramViewer({ diagram, allDiagrams }: { diagram: Diagram; allD
                     <button onClick={() => zoom(1.25)} className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-600"><ZoomIn className="w-4 h-4" /></button>
                     <button onClick={reset} title="뷰 초기화" className="p-2 rounded-lg hover:bg-slate-100 active:bg-slate-200 text-slate-500"><RotateCcw className="w-3.5 h-3.5" /></button>
                 </div>
-                <div className="ml-auto shrink-0">
+
+                {/* Desktop: parts search link */}
+                <div className="hidden md:block ml-auto shrink-0">
                     <Link href="/diagrams/parts" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 text-xs font-semibold transition-colors">
                         <Search className="w-3.5 h-3.5" />
                         부품 검색
                     </Link>
                 </div>
+
+                {/* Mobile: toggle diagram navigator */}
+                <button
+                    onClick={() => { setShowNav(v => !v); setShowParts(false) }}
+                    title="도면 목록"
+                    className={`md:hidden p-2 rounded-lg active:bg-slate-200 transition-colors ml-auto ${showNav ? 'bg-blue-100 text-blue-600' : 'hover:bg-slate-100 text-slate-600'}`}
+                >
+                    <BookOpen className="w-4 h-4" />
+                </button>
             </div>
 
             {/* ── Body: left sidebar + canvas + right sidebar ── */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 overflow-hidden relative">
+                {/* Backdrop (mobile overlay) */}
+                {(showParts || showNav) && (
+                    <div
+                        className="md:hidden absolute inset-0 z-10 bg-black/40"
+                        onClick={() => { setShowParts(false); setShowNav(false) }}
+                    />
+                )}
+
                 {/* Left parts sidebar */}
-                <PartsPanel diagramId={diagram.id} />
+                <div
+                    className={[
+                        'flex flex-col h-full z-20',
+                        showParts
+                            ? 'absolute inset-y-0 left-0 w-[85vw] max-w-xs shadow-2xl'
+                            : 'hidden md:flex',
+                        'md:relative md:w-80 md:shrink-0 md:shadow-none',
+                    ].join(' ')}
+                >
+                    <PartsPanel diagramId={diagram.id} onClose={() => setShowParts(false)} />
+                </div>
 
                 {/* Canvas */}
                 <div
@@ -527,13 +597,23 @@ export function DiagramViewer({ diagram, allDiagrams }: { diagram: Diagram; allD
                             alt={diagram.name}
                             draggable={false}
                             className="block max-w-none shadow-xl"
-                            style={{ maxWidth: '80vw', maxHeight: '85vh', width: 'auto', height: 'auto' }}
+                            style={{ maxWidth: '90vw', maxHeight: '85vh', width: 'auto', height: 'auto' }}
                         />
                     </div>
                 </div>
 
                 {/* Right diagram navigator */}
-                <DiagramNavigator currentId={diagram.id} diagrams={allDiagrams} />
+                <div
+                    className={[
+                        'flex flex-col h-full z-20',
+                        showNav
+                            ? 'absolute inset-y-0 right-0 w-[85vw] max-w-xs shadow-2xl'
+                            : 'hidden md:flex',
+                        'md:relative md:w-80 md:shrink-0 md:shadow-none',
+                    ].join(' ')}
+                >
+                    <DiagramNavigator currentId={diagram.id} diagrams={allDiagrams} onClose={() => setShowNav(false)} />
+                </div>
             </div>
         </div>
     )
