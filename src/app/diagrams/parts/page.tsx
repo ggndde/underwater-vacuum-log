@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Search, Package, BookOpen, ChevronRight, AlertCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 
 interface PartResult {
     id: number
@@ -21,7 +21,9 @@ interface DiagramResult {
 }
 
 export default function PartsSearchPage() {
-    const [query, setQuery] = useState('')
+    const searchParams = useSearchParams()
+    const initialQ = searchParams.get('q') ?? ''
+    const [query, setQuery] = useState(initialQ)
     const [parts, setParts] = useState<PartResult[]>([])
     const [diagrams, setDiagrams] = useState<DiagramResult[]>([])
     const [loading, setLoading] = useState(false)
@@ -31,7 +33,6 @@ export default function PartsSearchPage() {
     const [catalogReady, setCatalogReady] = useState<boolean | null>(null)
     const inputRef = useRef<HTMLInputElement>(null)
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-    const router = useRouter()
 
     // Check if catalog has been seeded
     useEffect(() => {
@@ -40,6 +41,11 @@ export default function PartsSearchPage() {
             .then(data => setCatalogReady(data.parts?.length > 0))
             .catch(() => setCatalogReady(false))
     }, [])
+
+    // Auto-search if query came from URL param
+    useEffect(() => {
+        if (initialQ) doSearch(initialQ)
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     const doSearch = useCallback(async (q: string) => {
         if (!q.trim()) { setParts([]); setDiagrams([]); setSearched(false); return }
