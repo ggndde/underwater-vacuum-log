@@ -121,6 +121,11 @@ export default function PoolsPage() {
         return (now.getTime() - bidDate.getTime()) < 3 * 24 * 60 * 60 * 1000; // 3 days for construction as "NEW"
     };
 
+    const getBidUrl = (bid: BidItem) => {
+        if (bid.bidNtceUrl && bid.bidNtceUrl.startsWith('http')) return bid.bidNtceUrl;
+        return `https://www.g2b.go.kr/pb/cm/pmakg/bid/bidinf/retrieveBidPblanc.do?bidno=${bid.bidNtceNo}&bidseq=${bid.bidNtceOrd}`;
+    };
+
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-6 min-h-screen">
             <header className="mb-8">
@@ -269,7 +274,7 @@ export default function PoolsPage() {
 
                                         <div className="mt-4 md:mt-0 flex md:flex-col gap-2 shrink-0">
                                             <a
-                                                href={bid.bidNtceUrl}
+                                                href={getBidUrl(bid)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/40 px-4 py-3 rounded-xl font-medium text-sm transition-colors border border-transparent dark:border-violet-800/30"
