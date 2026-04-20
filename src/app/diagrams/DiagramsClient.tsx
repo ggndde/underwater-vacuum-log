@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
     Upload, X, Loader2, FileImage, Trash2, AlertCircle,
-    Calendar, Tag, BookOpen, CheckCircle2, Pencil, Search,
+    Calendar, Tag, BookOpen, CheckCircle2, Pencil, Search, Sparkles,
 } from 'lucide-react'
 
 const CATEGORIES = ['CP', 'PP', 'NV3', '공용'] as const
@@ -285,6 +285,9 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
     const [showUpload, setShowUpload] = useState(false)
     const [activeTab, setActiveTab] = useState<FilterTab>('전체')
     const [thumbGenProgress, setThumbGenProgress] = useState<string | null>(null)
+    const [bulkDetecting, setBulkDetecting] = useState(false)
+    const [bulkProgress, setBulkProgress] = useState<string | null>(null)
+    const bulkCancelRef = useRef(false)
 
     // 썸네일이 없는 도면이 있으면 백그라운드에서 자동으로 생성
     useEffect(() => {
@@ -329,6 +332,42 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
         } catch { }
     }
 
+    const handleBulkDetect = useCallback(async () => {
+        // Only target diagrams with no hotspots yet
+        const targets = diagrams.filter(d => d._count.hotspots === 0)
+        if (targets.length === 0) {
+            setBulkProgress('모든 도면에 이미 부품 번호가 등록되어 있습니다.')
+            return
+        }
+        setBulkDetecting(true)
+        bulkCancelRef.current = false
+        let done = 0
+        let totalAdded = 0
+        for (const d of targets) {
+            if (bulkCancelRef.current) break
+            setBulkProgress(`감지 중... ${done}/${targets.length}장 완료 (${d.name})`)
+            try {
+                const res = await fetch(`/api/diagrams/${d.id}/hotspots/auto-detect`, { method: 'POST' })
+                const data = await res.json()
+                if (res.ok) totalAdded += data.added ?? 0
+            } catch { /* continue on error */ }
+            done++
+            // Refresh hotspot counts incrementally
+            setDiagrams(prev => prev.map(p => p.id === d.id
+                ? { ...p, _count: { hotspots: p._count.hotspots + 1 } } // rough marker
+                : p
+            ))
+        }
+        if (!bulkCancelRef.current) {
+            setBulkProgress(`완료: ${done}장 처리, 총 ${totalAdded}개 부품 번호 등록`)
+            // Refresh actual counts
+            await refresh()
+        } else {
+            setBulkProgress(`중단됨: ${done}장 처리 완료`)
+        }
+        setBulkDetecting(false)
+    }, [diagrams])
+
     async function handleDelete(id: number, name: string) {
         if (!confirm(`"${name}" 도면을 삭제할까요?`)) return
         await fetch(`/api/diagrams/${id}`, { method: 'DELETE' })
@@ -353,7 +392,7 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                     </h1>
                     <p className="text-sm text-slate-500 mt-1">도면을 클릭하면 확대해서 볼 수 있습니다</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                     <Link
                         href="/diagrams/parts"
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 text-sm font-bold hover:bg-violet-200 dark:hover:bg-violet-900/50 transition-colors"
@@ -361,6 +400,23 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                         <Search className="w-4 h-4" />
                         부품 검색
                     </Link>
+                    {bulkDetecting ? (
+                        <button
+                            onClick={() => { bulkCancelRef.current = true }}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-100 text-amber-700 text-sm font-bold hover:bg-amber-200 transition-colors"
+                        >
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            중단
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleBulkDetect}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-colors shadow-sm"
+                        >
+                            <Sparkles className="w-4 h-4" />
+                            전체 AI 감지
+                        </button>
+                    )}
                     <button
                         onClick={() => setShowUpload(true)}
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm"
@@ -376,6 +432,26 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                 <div className="flex items-center gap-2 px-4 py-2.5 mb-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-700">
                     <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                     {thumbGenProgress}
+                </div>
+            )}
+
+            {/* AI 일괄 감지 진행 배너 */}
+            {bulkProgress && (
+                <div className={`flex items-center gap-2 px-4 py-2.5 mb-4 rounded-xl text-sm border ${
+                    bulkDetecting
+                        ? 'bg-amber-50 border-amber-200 text-amber-700'
+                        : 'bg-green-50 border-green-200 text-green-700'
+                }`}>
+                    {bulkDetecting
+                        ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        : <Sparkles className="w-4 h-4 shrink-0" />
+                    }
+                    <span className="flex-1 truncate">{bulkProgress}</span>
+                    {!bulkDetecting && (
+                        <button onClick={() => setBulkProgress(null)} className="text-green-400 hover:text-green-600 shrink-0">
+                            <X className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
             )}
 
