@@ -40,6 +40,16 @@ Return ONLY valid JSON:
 
 Where the number is 1, 2, 3, or 4 corresponding to the image that is upright.`
 
+async function makeThumbnail(buffer: Buffer): Promise<string> {
+    const thumb = Buffer.from(
+        await sharp(buffer)
+            .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 55 })
+            .toBuffer()
+    )
+    return `data:image/jpeg;base64,${thumb.toString('base64')}`
+}
+
 async function detectOrientation(openai: OpenAI, buffer: Buffer): Promise<number> {
     try {
         const rotations = [0, 90, 180, 270]
@@ -106,7 +116,7 @@ export async function POST(req: NextRequest) {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
     // Apply EXIF auto-rotation and normalize to PNG
-    let finalMimeType = 'image/png'
+    const finalMimeType = 'image/png'
     let buffer: Buffer = Buffer.from(
         await sharp(Buffer.from(await file.arrayBuffer())).rotate().png().toBuffer()
     )
@@ -119,9 +129,10 @@ export async function POST(req: NextRequest) {
     }
 
     const dataUrl = `data:${finalMimeType};base64,${buffer.toString('base64')}`
+    const thumbnailData = await makeThumbnail(buffer)
 
     const diagram = await (prisma as any).diagramSheet.create({
-        data: { name, drawingNo, category, imageData: dataUrl, mimeType: finalMimeType },
+        data: { name, drawingNo, category, imageData: dataUrl, thumbnailData, mimeType: finalMimeType },
     })
 
     return NextResponse.json({ diagram }, { status: 201 })

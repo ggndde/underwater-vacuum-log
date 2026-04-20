@@ -23,6 +23,7 @@ type DiagramMeta = {
     category: string
     mimeType: string
     createdAt: string
+    thumbnailData: string | null
     _count: { hotspots: number }
 }
 
@@ -272,7 +273,7 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                             <Link href={`/diagrams/${d.id}`}>
                                 <div className="relative bg-slate-50 h-40 overflow-hidden">
                                     <img
-                                        src={`/api/diagrams/${d.id}/image`}
+                                        src={d.thumbnailData ?? `/api/diagrams/${d.id}/image`}
                                         alt={d.name}
                                         className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                                     />

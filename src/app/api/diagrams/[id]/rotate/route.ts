@@ -6,6 +6,16 @@ import sharp from 'sharp'
 
 export const dynamic = 'force-dynamic'
 
+async function makeThumbnail(buffer: Buffer): Promise<string> {
+    const thumb = Buffer.from(
+        await sharp(buffer)
+            .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 55 })
+            .toBuffer()
+    )
+    return `data:image/jpeg;base64,${thumb.toString('base64')}`
+}
+
 // POST /api/diagrams/[id]/rotate  { "degrees": 90 | 180 | 270 }
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
@@ -28,10 +38,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         await sharp(Buffer.from(base64Data, 'base64')).rotate(degrees).png().toBuffer()
     )
     const newDataUrl = `data:image/png;base64,${rotated.toString('base64')}`
+    const thumbnailData = await makeThumbnail(rotated)
 
     await (prisma as any).diagramSheet.update({
         where: { id },
-        data: { imageData: newDataUrl, mimeType: 'image/png' },
+        data: { imageData: newDataUrl, thumbnailData, mimeType: 'image/png' },
     })
 
     return NextResponse.json({ ok: true })
