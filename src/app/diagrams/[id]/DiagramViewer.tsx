@@ -344,7 +344,7 @@ export function DiagramViewer({ diagram }: { diagram: Diagram }) {
     }, [])
 
     return (
-        <div className="flex flex-col h-[calc(100vh-80px)]">
+        <div className="flex flex-col h-full">
             {/* ── Toolbar ── */}
             <div className="flex items-center gap-2 px-3 py-2 bg-white border-b border-slate-200 shrink-0">
                 <div className="flex items-center gap-0.5 shrink-0 border-r border-slate-200 pr-2 mr-0.5">

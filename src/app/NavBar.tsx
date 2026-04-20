@@ -112,7 +112,7 @@ export function NavBar({ userName }: { userName: string }) {
 
     return (
         <>
-            <nav className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white px-4 py-2.5 shadow-md sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800">
+            <nav id="main-nav" className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white px-4 py-2.5 shadow-md sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800">
                 <div className="max-w-6xl mx-auto flex justify-between items-center">
                     <Link href="/" className="font-bold text-lg sm:text-xl text-blue-600 dark:text-white hover:text-blue-700 dark:hover:text-slate-300 transition-colors tracking-tight shrink-0">
                         <span className="sm:hidden">Rosin</span>
