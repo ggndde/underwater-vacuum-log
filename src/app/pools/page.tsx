@@ -74,10 +74,6 @@ export default function PoolsPage() {
 
                 if (data.items && data.items.length > 0) {
                     allItems = [...allItems, ...data.items];
-                    if (allItems.length > 0) {
-                        console.log('[pools] sample bidNtceUrl:', allItems[0].bidNtceUrl);
-                        console.log('[pools] sample bidNtceNo:', allItems[0].bidNtceNo, 'bidNtceOrd:', allItems[0].bidNtceOrd);
-                    }
                     // Sort descending by date
                     allItems.sort((a, b) => (b.bidNtceDt || '').localeCompare(a.bidNtceDt || ''));
                     setBids(allItems); // Update UI incrementally
@@ -126,14 +122,7 @@ export default function PoolsPage() {
     };
 
     const getBidUrl = (bid: BidItem) => {
-        const oldUrl = bid.bidNtceUrl;
-        const qs = `bidno=${bid.bidNtceNo}&bidseq=${bid.bidNtceOrd}`;
-        if (oldUrl && oldUrl.includes('retrieveBidCnstwkPblanc.do')) {
-            const rawQs = oldUrl.split('?')[1] ?? qs;
-            return `https://www.g2b.go.kr/ep/invitation/publish/bidPublishInfoDtl.do?${rawQs}`;
-        }
-        if (oldUrl && oldUrl.startsWith('http') && !oldUrl.includes('/pb/cm/pmakg/')) return oldUrl;
-        return `https://www.g2b.go.kr/ep/invitation/publish/bidPublishInfoDtl.do?${qs}`;
+        return `https://www.g2b.go.kr/ep/invitation/publish/bidInfoDtl.do?bidno=${bid.bidNtceNo}&bidseq=${bid.bidNtceOrd}&releaseYn=Y&taskClCd=5`;
     };
 
     return (
