@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { format, subMonths, parse, differenceInDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Search, ExternalLink, Calendar, RefreshCw, AlertCircle, Clock, DollarSign, Building2 } from 'lucide-react';
+import { Search, ExternalLink, Calendar, RefreshCw, AlertCircle, Clock, DollarSign, Building2, Copy, Check } from 'lucide-react';
 
 interface BidItem {
     bidNtceNo: string;
@@ -121,8 +121,13 @@ export default function PoolsPage() {
         return (now.getTime() - bidDate.getTime()) < 3 * 24 * 60 * 60 * 1000; // 3 days for construction as "NEW"
     };
 
-    const getBidUrl = (bid: BidItem) => {
-        return `https://www.g2b.go.kr/ep/invitation/publish/bidInfoDtl.do?bidno=${bid.bidNtceNo}&bidseq=${bid.bidNtceOrd}&releaseYn=Y&taskClCd=5`;
+    const [copiedNo, setCopiedNo] = useState<string | null>(null);
+
+    const copyBidNo = (bidNtceNo: string) => {
+        navigator.clipboard.writeText(bidNtceNo).then(() => {
+            setCopiedNo(bidNtceNo);
+            setTimeout(() => setCopiedNo(null), 2000);
+        });
     };
 
     return (
@@ -273,13 +278,24 @@ export default function PoolsPage() {
 
                                         <div className="mt-4 md:mt-0 flex md:flex-col gap-2 shrink-0">
                                             <a
-                                                href={getBidUrl(bid)}
+                                                href="https://www.g2b.go.kr"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/40 px-4 py-3 rounded-xl font-medium text-sm transition-colors border border-transparent dark:border-violet-800/30"
+                                                title="나라장터에서 공고번호로 검색하세요"
                                             >
-                                                공고문 보기 <ExternalLink className="w-4 h-4" />
+                                                나라장터 <ExternalLink className="w-4 h-4" />
                                             </a>
+                                            <button
+                                                onClick={() => copyBidNo(bid.bidNtceNo)}
+                                                className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600 px-4 py-3 rounded-xl font-medium text-sm transition-colors border border-slate-200 dark:border-slate-600"
+                                                title="공고번호를 클립보드에 복사"
+                                            >
+                                                {copiedNo === bid.bidNtceNo
+                                                    ? <><Check className="w-4 h-4 text-green-500" /> 복사됨</>
+                                                    : <><Copy className="w-4 h-4" /> 공고번호</>
+                                                }
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
