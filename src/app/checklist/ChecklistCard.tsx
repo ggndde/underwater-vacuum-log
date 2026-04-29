@@ -1,11 +1,207 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, Clock, Truck, Building2, ChevronRight, Trash2, Loader2, XCircle, MinusCircle, ArrowRight } from 'lucide-react'
+import { CheckCircle2, Clock, Truck, Building2, ChevronRight, Trash2, Loader2, XCircle, MinusCircle, ArrowRight, Timer, Plus, X, ChevronDown, ChevronUp } from 'lucide-react'
 import { deleteWorkChecklist, moveToTodayWorkChecklist } from '@/app/actions'
 import { useRouter } from 'next/navigation'
 import { ChecklistPartSelector } from './ChecklistPartSelector'
+import { lookupError } from '@/lib/marinerErrors'
+
+type ErrorEntry = { code: string; count: string }
+
+function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; onSaved: (patch: Record<string, unknown>) => void }) {
+    const hasData = item.machineHours != null || item.machineCycles != null || item.machineErrors || item.machineNotes
+    const [open, setOpen] = useState(false)
+    const [hours, setHours] = useState(item.machineHours != null ? String(item.machineHours) : '')
+    const [cycles, setCycles] = useState(item.machineCycles != null ? String(item.machineCycles) : '')
+    const [entries, setEntries] = useState<ErrorEntry[]>(() => {
+        try { return item.machineErrors ? JSON.parse(item.machineErrors) : [] } catch { return [] }
+    })
+    const [notes, setNotes] = useState(item.machineNotes ?? '')
+    const [errCode, setErrCode] = useState('')
+    const [errCount, setErrCount] = useState('')
+    const [saving, setSaving] = useState(false)
+    const codeRef = useRef<HTMLInputElement>(null)
+
+    const lookup = errCode.trim() ? lookupError(parseInt(errCode.trim())) : undefined
+
+    const addEntry = () => {
+        const c = errCode.trim()
+        const n = errCount.trim()
+        if (!c) return
+        setEntries(prev => {
+            const exists = prev.findIndex(e => e.code === c)
+            if (exists >= 0) {
+                const next = [...prev]
+                next[exists] = { code: c, count: n }
+                return next
+            }
+            return [...prev, { code: c, count: n }]
+        })
+        setErrCode('')
+        setErrCount('')
+        codeRef.current?.focus()
+    }
+
+    const removeEntry = (code: string) => setEntries(prev => prev.filter(e => e.code !== code))
+
+    const handleSave = async () => {
+        setSaving(true)
+        const fd = new FormData()
+        fd.append('id', String(item.id))
+        fd.append('machineHours', hours)
+        fd.append('machineCycles', cycles)
+        fd.append('machineErrors', JSON.stringify(entries))
+        fd.append('machineNotes', notes)
+        await fetch('/api/checklist', { method: 'PATCH', body: fd })
+        onSaved({ machineHours: hours ? parseFloat(hours) : null, machineCycles: cycles ? parseInt(cycles) : null, machineErrors: JSON.stringify(entries), machineNotes: notes })
+        setSaving(false)
+        setOpen(false)
+    }
+
+    return (
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Timer className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">시간/사이클/에러</span>
+                    {hasData && !open && (
+                        <span className="text-xs text-slate-400 dark:text-slate-500 ml-1">
+                            {item.machineHours != null && `${item.machineHours}h`}
+                            {item.machineCycles != null && ` · ${item.machineCycles}c`}
+                            {entries.length > 0 && ` · 에러 ${entries.length}건`}
+                        </span>
+                    )}
+                </div>
+                {!done && (
+                    <button
+                        onClick={() => setOpen(v => !v)}
+                        className="flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40"
+                    >
+                        {open ? <><ChevronUp className="w-3.5 h-3.5" />닫기</> : hasData ? <><ChevronDown className="w-3.5 h-3.5" />수정</> : <>입력</>}
+                    </button>
+                )}
+            </div>
+
+            {open && (
+                <div className="mt-4 space-y-4">
+                    {/* Hours */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">⏱ Hours <span className="font-normal text-slate-400">(가동 시간)</span></label>
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.1"
+                            value={hours}
+                            onChange={e => setHours(e.target.value)}
+                            placeholder="예) 1250.5"
+                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors"
+                        />
+                    </div>
+
+                    {/* Cycles */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">🔄 Cycles</label>
+                        <input
+                            type="number"
+                            min="0"
+                            value={cycles}
+                            onChange={e => setCycles(e.target.value)}
+                            placeholder="예) 3840"
+                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors"
+                        />
+                    </div>
+
+                    {/* Errors */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">⚠️ Errors <span className="font-normal text-slate-400">(에러코드 : 발생횟수)</span></label>
+
+                        {/* 추가된 에러 칩 */}
+                        {entries.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-2.5">
+                                {entries.map(e => (
+                                    <span key={e.code} className="flex items-center gap-1 bg-red-50 dark:bg-red-900/25 border border-red-200 dark:border-red-700/40 text-red-700 dark:text-red-300 rounded-full px-2.5 py-0.5 text-xs font-mono font-bold">
+                                        {e.code}{e.count ? ` : ${e.count}` : ''}
+                                        <button onClick={() => removeEntry(e.code)} className="text-red-400 hover:text-red-600 ml-0.5">
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* 에러 입력 */}
+                        <div className="flex gap-2 items-center">
+                            <input
+                                ref={codeRef}
+                                type="number"
+                                value={errCode}
+                                onChange={e => setErrCode(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && addEntry()}
+                                placeholder="코드"
+                                className="w-20 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-red-400 transition-colors"
+                            />
+                            <span className="text-slate-400 font-bold">:</span>
+                            <input
+                                type="text"
+                                value={errCount}
+                                onChange={e => setErrCount(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && addEntry()}
+                                placeholder="횟수 (예: 1~3)"
+                                className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-red-400 transition-colors"
+                            />
+                            <button
+                                onClick={addEntry}
+                                disabled={!errCode.trim()}
+                                className="flex items-center gap-1 px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 rounded-lg text-xs font-bold disabled:opacity-40 transition-colors"
+                            >
+                                <Plus className="w-3.5 h-3.5" />추가
+                            </button>
+                        </div>
+
+                        {/* 실시간 에러 정보 */}
+                        {lookup && (
+                            <div className="mt-2.5 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl">
+                                <p className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-1">
+                                    <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded mr-1.5">{errCode}</span>
+                                    {lookup.name}
+                                    <span className="ml-1.5 text-[10px] font-normal text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">{lookup.category}</span>
+                                </p>
+                                <p className="text-xs text-amber-700 dark:text-amber-300 mb-1"><span className="font-semibold">원인:</span> {lookup.cause}</p>
+                                <p className="text-xs text-amber-700 dark:text-amber-300"><span className="font-semibold">해결:</span> {lookup.solution}</p>
+                            </div>
+                        )}
+                        {errCode.trim() && !lookup && parseInt(errCode.trim()) > 0 && (
+                            <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">코드 {errCode}에 대한 정보가 없습니다.</p>
+                        )}
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">📝 그 외 특이사항</label>
+                        <textarea
+                            value={notes}
+                            onChange={e => setNotes(e.target.value)}
+                            placeholder="특이사항, 메모 등 자유롭게 입력"
+                            rows={3}
+                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors resize-none"
+                        />
+                    </div>
+
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                        {saving ? '저장 중...' : '저장'}
+                    </button>
+                </div>
+            )}
+        </div>
+    )
+}
 
 const CRM_LABELS = [
   { key: 'crmUpdated', label: '고객관리 업데이트', emoji: '📋' },
@@ -309,6 +505,13 @@ export function ChecklistCard({ item: initialItem, parts = [], done: initialDone
                 </div>
               </div>
             ))}
+
+            {/* 시간/사이클/에러 */}
+            <MachineDataPanel
+              item={item}
+              done={done}
+              onSaved={(patch) => setItem((prev: any) => ({ ...prev, ...patch }))}
+            />
           </div>
         </div>
       )}
@@ -344,6 +547,15 @@ export function ChecklistCard({ item: initialItem, parts = [], done: initialDone
                 </div>
               </div>
             ))}
+
+            {/* 시간/사이클/에러 (AS 전용, 신규납품 제외) */}
+            {item.crmType !== 'NEW' && (
+              <MachineDataPanel
+                item={item}
+                done={done}
+                onSaved={(patch) => setItem((prev: any) => ({ ...prev, ...patch }))}
+              />
+            )}
           </div>
         </div>
       )}

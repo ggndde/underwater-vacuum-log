@@ -72,6 +72,10 @@ export async function PATCH(req: NextRequest) {
     if (fd.has('deliveryCarrier')) data.deliveryCarrier = fd.get('deliveryCarrier') as string
     if (fd.has('deliveryItems')) data.deliveryItems = fd.get('deliveryItems') as string
     if (fd.has('deliverySent')) data.deliverySent = parseTriState(fd.get('deliverySent'))
+    if (fd.has('machineHours')) data.machineHours = fd.get('machineHours') ? parseFloat(fd.get('machineHours') as string) : null
+    if (fd.has('machineCycles')) data.machineCycles = fd.get('machineCycles') ? parseInt(fd.get('machineCycles') as string) : null
+    if (fd.has('machineErrors')) data.machineErrors = fd.get('machineErrors') as string
+    if (fd.has('machineNotes')) data.machineNotes = fd.get('machineNotes') as string
     if (fd.has('crmUpdated')) data.crmUpdated = parseTriState(fd.get('crmUpdated'))
     if (fd.has('poolInfoUpdated')) data.poolInfoUpdated = parseTriState(fd.get('poolInfoUpdated'))
     if (fd.has('quoteSent')) data.quoteSent = parseTriState(fd.get('quoteSent'))

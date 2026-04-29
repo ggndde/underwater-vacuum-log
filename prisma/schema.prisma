@@ -173,6 +173,12 @@ model WorkChecklist {
   paymentUpdated   Boolean? // 결재현황 업데이트
   naverWorksLogged Boolean? // 네이버 웍스 기록
 
+  // 시간/사이클/에러 (택배·AS 전용)
+  machineHours  Float?  // 가동 시간 (hours)
+  machineCycles Int?    // 사이클 수
+  machineErrors String? // JSON: [{code:190, count:"1~3"}, ...]
+  machineNotes  String? // 특이사항
+
   completed Boolean  @default(false) // 모든 스텝 완료 여부
   createdBy String   @default("")
   createdAt DateTime @default(now())
