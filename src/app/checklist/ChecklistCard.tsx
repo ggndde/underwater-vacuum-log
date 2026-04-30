@@ -250,8 +250,6 @@ function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; o
             )}
         </div>
     )
-        </div>
-    )
 }
 
 const CRM_LABELS = [
