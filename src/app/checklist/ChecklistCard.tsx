@@ -139,6 +139,28 @@ function MachineUnitPanel({ unit, onChange, onRemove, canRemove, done }: {
                         )}
                     </div>
                 )}
+
+                {/* 등록된 에러 코드 종합 정보 */}
+                {unit.errors.length > 0 && (() => {
+                    const uniqueCodes = unit.errors.map(e => e.code).filter((c, i, arr) => arr.indexOf(c) === i)
+                    const known = uniqueCodes.map(c => ({ code: c, info: lookupError(parseInt(c)) })).filter(e => e.info)
+                    if (known.length === 0) return null
+                    return (
+                        <div className="mt-2 space-y-2">
+                            {known.map(({ code, info }) => (
+                                <div key={code} className="p-3 bg-red-50 dark:bg-red-900/15 border border-red-100 dark:border-red-800/30 rounded-xl">
+                                    <p className="text-xs font-bold text-red-800 dark:text-red-300 mb-1">
+                                        <span className="font-mono bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 rounded mr-1.5">{code}</span>
+                                        {info!.name}
+                                        <span className="ml-1.5 text-[10px] font-normal text-red-500 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded-full">{info!.category}</span>
+                                    </p>
+                                    <p className="text-xs text-red-700 dark:text-red-300 mb-0.5"><span className="font-semibold">원인:</span> {info!.cause}</p>
+                                    <p className="text-xs text-red-700 dark:text-red-300"><span className="font-semibold">해결:</span> {info!.solution}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                })()}
             </div>
 
             {/* Notes */}
