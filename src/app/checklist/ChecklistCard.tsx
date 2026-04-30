@@ -132,31 +132,33 @@ function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; o
                         )}
 
                         {/* 에러 입력 */}
-                        <div className="flex gap-2 items-center">
-                            <input
-                                ref={codeRef}
-                                type="number"
-                                value={errCode}
-                                onChange={e => setErrCode(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && addEntry()}
-                                placeholder="코드"
-                                className="w-20 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-red-400 transition-colors"
-                            />
-                            <span className="text-slate-400 font-bold">:</span>
-                            <input
-                                type="text"
-                                value={errCount}
-                                onChange={e => setErrCount(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && addEntry()}
-                                placeholder="횟수 (예: 1~3)"
-                                className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-red-400 transition-colors"
-                            />
+                        <div className="flex flex-col gap-2">
+                            <div className="flex gap-2 items-center">
+                                <input
+                                    ref={codeRef}
+                                    type="number"
+                                    value={errCode}
+                                    onChange={e => setErrCode(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && addEntry()}
+                                    placeholder="코드"
+                                    className="w-20 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-red-400 transition-colors"
+                                />
+                                <span className="text-slate-400 font-bold">:</span>
+                                <input
+                                    type="text"
+                                    value={errCount}
+                                    onChange={e => setErrCount(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && addEntry()}
+                                    placeholder="발생횟수 (예: 1~3)"
+                                    className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-red-400 transition-colors"
+                                />
+                            </div>
                             <button
                                 onClick={addEntry}
                                 disabled={!errCode.trim()}
-                                className="flex items-center gap-1 px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 rounded-lg text-xs font-bold disabled:opacity-40 transition-colors"
+                                className="flex items-center justify-center gap-1 w-full py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg text-xs font-bold disabled:opacity-40 transition-colors"
                             >
-                                <Plus className="w-3.5 h-3.5" />추가
+                                <Plus className="w-3.5 h-3.5" />에러 추가
                             </button>
                         </div>
 
