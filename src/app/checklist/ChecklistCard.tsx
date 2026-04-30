@@ -30,21 +30,13 @@ function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; o
         const c = errCode.trim()
         const n = errCount.trim()
         if (!c) return
-        setEntries(prev => {
-            const exists = prev.findIndex(e => e.code === c)
-            if (exists >= 0) {
-                const next = [...prev]
-                next[exists] = { code: c, count: n }
-                return next
-            }
-            return [...prev, { code: c, count: n }]
-        })
+        setEntries(prev => [...prev, { code: c, count: n }])
         setErrCode('')
         setErrCount('')
         codeRef.current?.focus()
     }
 
-    const removeEntry = (code: string) => setEntries(prev => prev.filter(e => e.code !== code))
+    const removeEntry = (idx: number) => setEntries(prev => prev.filter((_, i) => i !== idx))
 
     const handleSave = async () => {
         setSaving(true)
@@ -120,10 +112,10 @@ function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; o
                         {/* 추가된 에러 칩 */}
                         {entries.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mb-2.5">
-                                {entries.map(e => (
-                                    <span key={e.code} className="flex items-center gap-1 bg-red-50 dark:bg-red-900/25 border border-red-200 dark:border-red-700/40 text-red-700 dark:text-red-300 rounded-full px-2.5 py-0.5 text-xs font-mono font-bold">
+                                {entries.map((e, i) => (
+                                    <span key={i} className="flex items-center gap-1 bg-red-50 dark:bg-red-900/25 border border-red-200 dark:border-red-700/40 text-red-700 dark:text-red-300 rounded-full px-2.5 py-0.5 text-xs font-mono font-bold">
                                         {e.code}{e.count ? ` : ${e.count}` : ''}
-                                        <button onClick={() => removeEntry(e.code)} className="text-red-400 hover:text-red-600 ml-0.5">
+                                        <button onClick={() => removeEntry(i)} className="text-red-400 hover:text-red-600 ml-0.5">
                                             <X className="w-3 h-3" />
                                         </button>
                                     </span>
