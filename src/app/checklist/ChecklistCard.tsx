@@ -30,7 +30,16 @@ function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; o
         const c = errCode.trim()
         const n = errCount.trim()
         if (!c) return
-        setEntries(prev => [...prev, { code: c, count: n }])
+        setEntries(prev => {
+            const idx = prev.findIndex(e => e.code === c)
+            if (idx >= 0) {
+                const next = [...prev]
+                const existing = next[idx].count
+                next[idx] = { code: c, count: existing && n ? `${existing}, ${n}` : existing || n }
+                return next
+            }
+            return [...prev, { code: c, count: n }]
+        })
         setErrCode('')
         setErrCount('')
         codeRef.current?.focus()
