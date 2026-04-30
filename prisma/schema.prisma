@@ -174,10 +174,11 @@ model WorkChecklist {
   naverWorksLogged Boolean? // 네이버 웍스 기록
 
   // 시간/사이클/에러 (택배·AS 전용)
-  machineHours  Float?  // 가동 시간 (hours)
-  machineCycles Int?    // 사이클 수
-  machineErrors String? // JSON: [{code:190, count:"1~3"}, ...]
-  machineNotes  String? // 특이사항
+  machineHours  Float?  // 레거시
+  machineCycles Int?    // 레거시
+  machineErrors String? // 레거시
+  machineNotes  String? // 레거시
+  machineData   String? // JSON: [{unitNo, serialNo, hours, cycles, errors, notes}, ...]
 
   completed Boolean  @default(false) // 모든 스텝 완료 여부
   createdBy String   @default("")

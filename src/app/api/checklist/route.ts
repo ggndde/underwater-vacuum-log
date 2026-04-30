@@ -76,6 +76,7 @@ export async function PATCH(req: NextRequest) {
     if (fd.has('machineCycles')) data.machineCycles = fd.get('machineCycles') ? parseInt(fd.get('machineCycles') as string) : null
     if (fd.has('machineErrors')) data.machineErrors = fd.get('machineErrors') as string
     if (fd.has('machineNotes')) data.machineNotes = fd.get('machineNotes') as string
+    if (fd.has('machineData')) data.machineData = fd.get('machineData') as string
     if (fd.has('crmUpdated')) data.crmUpdated = parseTriState(fd.get('crmUpdated'))
     if (fd.has('poolInfoUpdated')) data.poolInfoUpdated = parseTriState(fd.get('poolInfoUpdated'))
     if (fd.has('quoteSent')) data.quoteSent = parseTriState(fd.get('quoteSent'))

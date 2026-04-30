@@ -10,18 +10,24 @@ import { lookupError } from '@/lib/marinerErrors'
 
 type ErrorEntry = { code: string; count: string }
 
-function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; onSaved: (patch: Record<string, unknown>) => void }) {
-    const hasData = item.machineHours != null || item.machineCycles != null || item.machineErrors || item.machineNotes
-    const [open, setOpen] = useState(false)
-    const [hours, setHours] = useState(item.machineHours != null ? String(item.machineHours) : '')
-    const [cycles, setCycles] = useState(item.machineCycles != null ? String(item.machineCycles) : '')
-    const [entries, setEntries] = useState<ErrorEntry[]>(() => {
-        try { return item.machineErrors ? JSON.parse(item.machineErrors) : [] } catch { return [] }
-    })
-    const [notes, setNotes] = useState(item.machineNotes ?? '')
+type MachineUnit = {
+    unitNo: number
+    serialNo: string
+    hours: string
+    cycles: string
+    errors: ErrorEntry[]
+    notes: string
+}
+
+function MachineUnitPanel({ unit, onChange, onRemove, canRemove, done }: {
+    unit: MachineUnit
+    onChange: (patch: Partial<MachineUnit>) => void
+    onRemove: () => void
+    canRemove: boolean
+    done: boolean
+}) {
     const [errCode, setErrCode] = useState('')
     const [errCount, setErrCount] = useState('')
-    const [saving, setSaving] = useState(false)
     const codeRef = useRef<HTMLInputElement>(null)
 
     const lookup = errCode.trim() ? lookupError(parseInt(errCode.trim())) : undefined
@@ -30,142 +36,95 @@ function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; o
         const c = errCode.trim()
         const n = errCount.trim()
         if (!c) return
-        setEntries(prev => {
-            const idx = prev.findIndex(e => e.code === c)
-            if (idx >= 0) {
-                const next = [...prev]
-                const existing = next[idx].count
-                next[idx] = { code: c, count: existing && n ? `${existing}, ${n}` : existing || n }
-                return next
-            }
-            return [...prev, { code: c, count: n }]
-        })
+        const idx = unit.errors.findIndex(e => e.code === c)
+        let next: ErrorEntry[]
+        if (idx >= 0) {
+            next = [...unit.errors]
+            const existing = next[idx].count
+            next[idx] = { code: c, count: existing && n ? `${existing}, ${n}` : existing || n }
+        } else {
+            next = [...unit.errors, { code: c, count: n }]
+        }
+        onChange({ errors: next })
         setErrCode('')
         setErrCount('')
         codeRef.current?.focus()
     }
 
-    const removeEntry = (idx: number) => setEntries(prev => prev.filter((_, i) => i !== idx))
-
-    const handleSave = async () => {
-        setSaving(true)
-        const fd = new FormData()
-        fd.append('id', String(item.id))
-        fd.append('machineHours', hours)
-        fd.append('machineCycles', cycles)
-        fd.append('machineErrors', JSON.stringify(entries))
-        fd.append('machineNotes', notes)
-        await fetch('/api/checklist', { method: 'PATCH', body: fd })
-        onSaved({ machineHours: hours ? parseFloat(hours) : null, machineCycles: cycles ? parseInt(cycles) : null, machineErrors: JSON.stringify(entries), machineNotes: notes })
-        setSaving(false)
-        setOpen(false)
-    }
+    const removeEntry = (i: number) => onChange({ errors: unit.errors.filter((_, idx) => idx !== i) })
 
     return (
-        <div className="px-4 py-3 sm:px-5 sm:py-3.5">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Timer className="w-4 h-4 text-orange-400 flex-shrink-0" />
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">시간/사이클/에러</span>
-                    {hasData && !open && (
-                        <span className="text-xs text-slate-400 dark:text-slate-500 ml-1">
-                            {item.machineHours != null && `${item.machineHours}h`}
-                            {item.machineCycles != null && ` · ${item.machineCycles}c`}
-                            {entries.length > 0 && ` · 에러 ${entries.length}건`}
-                        </span>
-                    )}
-                </div>
-                {!done && (
-                    <button
-                        onClick={() => setOpen(v => !v)}
-                        className="flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40"
-                    >
-                        {open ? <><ChevronUp className="w-3.5 h-3.5" />닫기</> : hasData ? <><ChevronDown className="w-3.5 h-3.5" />수정</> : <>입력</>}
+        <div className="border border-slate-200 dark:border-slate-700/60 rounded-xl p-3 space-y-3 bg-white dark:bg-slate-800/60">
+            {/* 헤더: 호기 + 시리얼 */}
+            <div className="flex items-center gap-2">
+                <span className="text-sm font-black text-orange-500 dark:text-orange-400 shrink-0 w-10">{unit.unitNo}호기</span>
+                <input
+                    type="text"
+                    value={unit.serialNo}
+                    onChange={e => onChange({ serialNo: e.target.value })}
+                    disabled={done}
+                    placeholder="Serial No."
+                    className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors disabled:opacity-50 font-mono"
+                />
+                {canRemove && !done && (
+                    <button onClick={onRemove} className="text-slate-300 dark:text-slate-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0">
+                        <X className="w-4 h-4" />
                     </button>
                 )}
             </div>
 
-            {open && (
-                <div className="mt-4 space-y-4">
-                    {/* Hours */}
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">⏱ Hours <span className="font-normal text-slate-400">(가동 시간)</span></label>
-                        <input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={hours}
-                            onChange={e => setHours(e.target.value)}
-                            placeholder="예) 1250.5"
-                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors"
-                        />
+            {/* Hours + Cycles */}
+            <div className="flex gap-2">
+                <div className="flex-1">
+                    <label className="block text-xs font-bold text-slate-400 mb-1">⏱ Hours</label>
+                    <input type="number" min="0" step="0.1" value={unit.hours} disabled={done}
+                        onChange={e => onChange({ hours: e.target.value })}
+                        placeholder="0.0"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors disabled:opacity-50" />
+                </div>
+                <div className="flex-1">
+                    <label className="block text-xs font-bold text-slate-400 mb-1">🔄 Cycles</label>
+                    <input type="number" min="0" value={unit.cycles} disabled={done}
+                        onChange={e => onChange({ cycles: e.target.value })}
+                        placeholder="0"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors disabled:opacity-50" />
+                </div>
+            </div>
+
+            {/* Errors */}
+            <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1.5">⚠️ Errors</label>
+                {unit.errors.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                        {unit.errors.map((e, i) => (
+                            <span key={i} className="flex items-center gap-1 bg-red-50 dark:bg-red-900/25 border border-red-200 dark:border-red-700/40 text-red-700 dark:text-red-300 rounded-full px-2.5 py-0.5 text-xs font-mono font-bold">
+                                {e.code}{e.count ? ` : ${e.count}` : ''}
+                                {!done && <button onClick={() => removeEntry(i)} className="text-red-400 hover:text-red-600 ml-0.5"><X className="w-3 h-3" /></button>}
+                            </span>
+                        ))}
                     </div>
-
-                    {/* Cycles */}
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">🔄 Cycles</label>
-                        <input
-                            type="number"
-                            min="0"
-                            value={cycles}
-                            onChange={e => setCycles(e.target.value)}
-                            placeholder="예) 3840"
-                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors"
-                        />
-                    </div>
-
-                    {/* Errors */}
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">⚠️ Errors <span className="font-normal text-slate-400">(에러코드 : 발생횟수)</span></label>
-
-                        {/* 추가된 에러 칩 */}
-                        {entries.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mb-2.5">
-                                {entries.map((e, i) => (
-                                    <span key={i} className="flex items-center gap-1 bg-red-50 dark:bg-red-900/25 border border-red-200 dark:border-red-700/40 text-red-700 dark:text-red-300 rounded-full px-2.5 py-0.5 text-xs font-mono font-bold">
-                                        {e.code}{e.count ? ` : ${e.count}` : ''}
-                                        <button onClick={() => removeEntry(i)} className="text-red-400 hover:text-red-600 ml-0.5">
-                                            <X className="w-3 h-3" />
-                                        </button>
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* 에러 입력 */}
-                        <div className="flex flex-col gap-2">
-                            <div className="flex gap-2 items-center">
-                                <input
-                                    ref={codeRef}
-                                    type="number"
-                                    value={errCode}
-                                    onChange={e => setErrCode(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && addEntry()}
-                                    placeholder="코드"
-                                    className="w-20 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-red-400 transition-colors"
-                                />
-                                <span className="text-slate-400 font-bold">:</span>
-                                <input
-                                    type="text"
-                                    value={errCount}
-                                    onChange={e => setErrCount(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && addEntry()}
-                                    placeholder="발생횟수 (예: 1~3)"
-                                    className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-red-400 transition-colors"
-                                />
-                            </div>
-                            <button
-                                onClick={addEntry}
-                                disabled={!errCode.trim()}
-                                className="flex items-center justify-center gap-1 w-full py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg text-xs font-bold disabled:opacity-40 transition-colors"
-                            >
-                                <Plus className="w-3.5 h-3.5" />에러 추가
-                            </button>
+                )}
+                {!done && (
+                    <div className="flex flex-col gap-2">
+                        <div className="flex gap-2 items-center">
+                            <input ref={codeRef} type="number" value={errCode}
+                                onChange={e => setErrCode(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && addEntry()}
+                                placeholder="코드"
+                                className="w-20 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-red-400 transition-colors" />
+                            <span className="text-slate-400 font-bold">:</span>
+                            <input type="text" value={errCount}
+                                onChange={e => setErrCount(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && addEntry()}
+                                placeholder="발생횟수 (예: 1~3)"
+                                className="flex-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-red-400 transition-colors" />
                         </div>
-
-                        {/* 실시간 에러 정보 */}
+                        <button onClick={addEntry} disabled={!errCode.trim()}
+                            className="flex items-center justify-center gap-1 w-full py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg text-xs font-bold disabled:opacity-40 transition-colors">
+                            <Plus className="w-3.5 h-3.5" />에러 추가
+                        </button>
                         {lookup && (
-                            <div className="mt-2.5 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl">
+                            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl">
                                 <p className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-1">
                                     <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 rounded mr-1.5">{errCode}</span>
                                     {lookup.name}
@@ -176,32 +135,121 @@ function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; o
                             </div>
                         )}
                         {errCode.trim() && !lookup && parseInt(errCode.trim()) > 0 && (
-                            <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">코드 {errCode}에 대한 정보가 없습니다.</p>
+                            <p className="text-xs text-slate-400 dark:text-slate-500">코드 {errCode}에 대한 정보가 없습니다.</p>
                         )}
                     </div>
+                )}
+            </div>
 
-                    {/* Notes */}
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5">📝 그 외 특이사항</label>
-                        <textarea
-                            value={notes}
-                            onChange={e => setNotes(e.target.value)}
-                            placeholder="특이사항, 메모 등 자유롭게 입력"
-                            rows={3}
-                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors resize-none"
+            {/* Notes */}
+            <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">📝 특이사항</label>
+                <textarea value={unit.notes} disabled={done}
+                    onChange={e => onChange({ notes: e.target.value })}
+                    placeholder="특이사항, 메모 등"
+                    rows={2}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors resize-none disabled:opacity-50" />
+            </div>
+        </div>
+    )
+}
+
+function initMachines(item: any): MachineUnit[] {
+    try {
+        const data = item.machineData ? JSON.parse(item.machineData) : null
+        if (Array.isArray(data) && data.length > 0) return data
+        // 레거시 필드 마이그레이션
+        if (item.machineHours != null || item.machineCycles != null || item.machineErrors || item.machineNotes) {
+            return [{
+                unitNo: 1, serialNo: '',
+                hours: item.machineHours != null ? String(item.machineHours) : '',
+                cycles: item.machineCycles != null ? String(item.machineCycles) : '',
+                errors: item.machineErrors ? JSON.parse(item.machineErrors) : [],
+                notes: item.machineNotes ?? '',
+            }]
+        }
+    } catch {}
+    return [{ unitNo: 1, serialNo: '', hours: '', cycles: '', errors: [], notes: '' }]
+}
+
+function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; onSaved: (patch: Record<string, unknown>) => void }) {
+    const hasData = !!(item.machineData || item.machineHours != null || item.machineCycles != null || item.machineErrors || item.machineNotes)
+    const [open, setOpen] = useState(false)
+    const [machines, setMachines] = useState<MachineUnit[]>(() => initMachines(item))
+    const [saving, setSaving] = useState(false)
+
+    const updateMachine = (i: number, patch: Partial<MachineUnit>) =>
+        setMachines(prev => { const next = [...prev]; next[i] = { ...next[i], ...patch }; return next })
+
+    const addMachine = () =>
+        setMachines(prev => [...prev, { unitNo: prev.length + 1, serialNo: '', hours: '', cycles: '', errors: [], notes: '' }])
+
+    const removeMachine = (i: number) =>
+        setMachines(prev => prev.filter((_, idx) => idx !== i).map((m, idx) => ({ ...m, unitNo: idx + 1 })))
+
+    const handleSave = async () => {
+        setSaving(true)
+        const fd = new FormData()
+        fd.append('id', String(item.id))
+        fd.append('machineData', JSON.stringify(machines))
+        await fetch('/api/checklist', { method: 'PATCH', body: fd })
+        onSaved({ machineData: JSON.stringify(machines) })
+        setSaving(false)
+        setOpen(false)
+    }
+
+    const summary = machines.map(m => {
+        const parts = [m.hours && `${m.hours}h`, m.cycles && `${m.cycles}c`, m.errors.length && `에러 ${m.errors.length}건`].filter(Boolean).join(' ')
+        return parts ? `${m.unitNo}호기 ${parts}` : ''
+    }).filter(Boolean).join(' | ')
+
+    return (
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0">
+                    <Timer className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 shrink-0">시간/사이클/에러</span>
+                    {hasData && !open && summary && (
+                        <span className="text-xs text-slate-400 dark:text-slate-500 truncate">{summary}</span>
+                    )}
+                </div>
+                {!done && (
+                    <button onClick={() => setOpen(v => !v)}
+                        className="flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 shrink-0 ml-2">
+                        {open ? <><ChevronUp className="w-3.5 h-3.5" />닫기</> : hasData ? <><ChevronDown className="w-3.5 h-3.5" />수정</> : <>입력</>}
+                    </button>
+                )}
+            </div>
+
+            {open && (
+                <div className="mt-4 space-y-3">
+                    {machines.map((m, i) => (
+                        <MachineUnitPanel
+                            key={i}
+                            unit={m}
+                            onChange={patch => updateMachine(i, patch)}
+                            onRemove={() => removeMachine(i)}
+                            canRemove={machines.length > 1}
+                            done={done}
                         />
-                    </div>
+                    ))}
 
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    {!done && (
+                        <button onClick={addMachine}
+                            className="flex items-center justify-center gap-2 w-full py-2.5 border-2 border-dashed border-orange-200 dark:border-orange-800/40 text-orange-400 dark:text-orange-500 hover:border-orange-400 hover:text-orange-500 dark:hover:border-orange-600 rounded-xl text-sm font-bold transition-colors">
+                            <Plus className="w-4 h-4" />호기 추가
+                        </button>
+                    )}
+
+                    <button onClick={handleSave} disabled={saving}
+                        className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                         {saving ? '저장 중...' : '저장'}
                     </button>
                 </div>
             )}
+        </div>
+    )
         </div>
     )
 }
