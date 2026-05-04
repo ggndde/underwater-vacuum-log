@@ -22,6 +22,7 @@ Return ONLY valid JSON in this exact format:
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.name) return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 })
+    if (session.user.name !== '배근수') return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
 
     const id = parseInt(params.id)
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })

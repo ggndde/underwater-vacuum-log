@@ -280,7 +280,7 @@ function NameEditor({ id, name, onSaved }: { id: number; name: string; onSaved: 
 }
 
 // ── Main List Component ───────────────────────────────────────────────────────
-export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
+export function DiagramsClient({ initial, isMaster = false }: { initial: DiagramMeta[]; isMaster?: boolean }) {
     const [diagrams, setDiagrams] = useState(initial)
     const [showUpload, setShowUpload] = useState(false)
     const [activeTab, setActiveTab] = useState<FilterTab>('전체')
@@ -400,7 +400,7 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                         <Search className="w-4 h-4" />
                         부품 검색
                     </Link>
-                    {bulkDetecting ? (
+                    {isMaster && (bulkDetecting ? (
                         <button
                             onClick={() => { bulkCancelRef.current = true }}
                             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-100 text-amber-700 text-sm font-bold hover:bg-amber-200 transition-colors"
@@ -416,7 +416,7 @@ export function DiagramsClient({ initial }: { initial: DiagramMeta[] }) {
                             <Sparkles className="w-4 h-4" />
                             전체 AI 감지
                         </button>
-                    )}
+                    ))}
                     <button
                         onClick={() => setShowUpload(true)}
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm"
