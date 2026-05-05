@@ -169,8 +169,8 @@ function MachineUnitPanel({ unit, onChange, onRemove, canRemove, done }: {
                 <textarea value={unit.notes} disabled={done}
                     onChange={e => onChange({ notes: e.target.value })}
                     placeholder="특이사항, 메모 등"
-                    rows={2}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors resize-none disabled:opacity-50" />
+                    rows={5}
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-orange-400 transition-colors resize-y disabled:opacity-50" />
             </div>
         </div>
     )
