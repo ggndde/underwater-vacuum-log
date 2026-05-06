@@ -80,7 +80,9 @@ function glyphsToString(glyphs: any[]): string {
 }
 
 async function extractGreenLines(buffer: Buffer): Promise<string[]> {
-    const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs' as any)
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs' as any)
+    const { getDocument, GlobalWorkerOptions } = pdfjs
+    GlobalWorkerOptions.workerSrc = ''  // disable worker for Node.js server-side
 
     const doc = await getDocument({
         data: new Uint8Array(buffer),
