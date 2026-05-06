@@ -3,54 +3,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
+import { PDFParse } from 'pdf-parse'
+import { getData as getWorkerData } from 'pdf-parse/worker'
 
 export const dynamic = 'force-dynamic'
 
-// Node.js polyfills for pdfjs-dist — must be at module scope BEFORE pdfjs-dist is imported
-if (typeof (globalThis as any).DOMMatrix === 'undefined') {
-    (globalThis as any).DOMMatrix = class DOMMatrix {
-        a = 1; b = 0; c = 0; d = 1; e = 0; f = 0
-        get m11() { return this.a } get m12() { return this.b }
-        get m21() { return this.c } get m22() { return this.d }
-        get m41() { return this.e } get m42() { return this.f }
-        is2D = true; isIdentity = true
-        constructor(init?: number[] | string) {
-            if (Array.isArray(init) && init.length >= 6) {
-                [this.a, this.b, this.c, this.d, this.e, this.f] = init
-            }
-        }
-        multiply(o: any) {
-            return new (globalThis as any).DOMMatrix([
-                this.a * o.a + this.c * o.b, this.b * o.a + this.d * o.b,
-                this.a * o.c + this.c * o.d, this.b * o.c + this.d * o.d,
-                this.a * o.e + this.c * o.f + this.e, this.b * o.e + this.d * o.f + this.f,
-            ])
-        }
-        translate(tx: number, ty: number) { return this.multiply(new (globalThis as any).DOMMatrix([1, 0, 0, 1, tx, ty])) }
-        scale(sx: number, sy?: number) { return this.multiply(new (globalThis as any).DOMMatrix([sx, 0, 0, sy ?? sx, 0, 0])) }
-        inverse() {
-            const det = this.a * this.d - this.b * this.c
-            if (!det) return new (globalThis as any).DOMMatrix()
-            return new (globalThis as any).DOMMatrix([
-                this.d / det, -this.b / det, -this.c / det, this.a / det,
-                (this.c * this.f - this.d * this.e) / det, (this.b * this.e - this.a * this.f) / det,
-            ])
-        }
-        transformPoint(p: any) { return { x: this.a * p.x + this.c * p.y + this.e, y: this.b * p.x + this.d * p.y + this.f, z: 0, w: 1 } }
-        toString() { return `matrix(${this.a},${this.b},${this.c},${this.d},${this.e},${this.f})` }
-    }
-}
-if (typeof (globalThis as any).Path2D === 'undefined') {
-    (globalThis as any).Path2D = class Path2D {
-        constructor(_?: any) {}
-        addPath() {} closePath() {} moveTo() {} lineTo() {}
-        bezierCurveTo() {} quadraticCurveTo() {} arc() {} arcTo() {} ellipse() {} rect() {}
-    }
-}
-
 const openai = new OpenAI()
 
-// pdfjs-dist OPS constants
+// Sets GlobalWorkerOptions.workerSrc to the bundled base64 data URL and assigns globalThis.pdfjs
+PDFParse.setWorker(getWorkerData())
+
 const OPS = {
     setFillRGBColor: 59,
     setFillGray: 57,
@@ -80,11 +42,8 @@ function glyphsToString(glyphs: any[]): string {
 }
 
 async function extractGreenLines(buffer: Buffer): Promise<string[]> {
-    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs' as any)
-    const { getDocument, GlobalWorkerOptions } = pdfjs
-    GlobalWorkerOptions.workerSrc = ''  // disable worker for Node.js server-side
-
-    const doc = await getDocument({
+    const pdfjs: any = (globalThis as any).pdfjs
+    const doc = await pdfjs.getDocument({
         data: new Uint8Array(buffer),
         useSystemFonts: true,
         disableFontFace: true,
