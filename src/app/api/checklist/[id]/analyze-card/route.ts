@@ -3,15 +3,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
-import { PDFParse } from 'pdf-parse'
-import { getData as getWorkerData } from 'pdf-parse/worker'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 export const dynamic = 'force-dynamic'
 
 const openai = new OpenAI()
-
-// Sets GlobalWorkerOptions.workerSrc to the bundled base64 data URL and assigns globalThis.pdfjs
-PDFParse.setWorker(getWorkerData())
 
 const OPS = {
     setFillRGBColor: 59,
@@ -41,8 +38,22 @@ function glyphsToString(glyphs: any[]): string {
         .join('')
 }
 
+let workerSrc: string | null = null
+
+function getWorkerSrc(): string {
+    if (!workerSrc) {
+        const workerPath = join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs')
+        const data = readFileSync(workerPath).toString('base64')
+        workerSrc = `data:text/javascript;base64,${data}`
+    }
+    return workerSrc
+}
+
 async function extractGreenLines(buffer: Buffer): Promise<string[]> {
-    const pdfjs: any = (globalThis as any).pdfjs
+    // Dynamic import avoids webpack bundling pdfjs-dist (which includes browser-only APIs)
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs' as string)
+    pdfjs.GlobalWorkerOptions.workerSrc = getWorkerSrc()
+
     const doc = await pdfjs.getDocument({
         data: new Uint8Array(buffer),
         useSystemFonts: true,
