@@ -6,9 +6,51 @@ import OpenAI from 'openai'
 
 export const dynamic = 'force-dynamic'
 
+// Node.js polyfills for pdfjs-dist — must be at module scope BEFORE pdfjs-dist is imported
+if (typeof (globalThis as any).DOMMatrix === 'undefined') {
+    (globalThis as any).DOMMatrix = class DOMMatrix {
+        a = 1; b = 0; c = 0; d = 1; e = 0; f = 0
+        get m11() { return this.a } get m12() { return this.b }
+        get m21() { return this.c } get m22() { return this.d }
+        get m41() { return this.e } get m42() { return this.f }
+        is2D = true; isIdentity = true
+        constructor(init?: number[] | string) {
+            if (Array.isArray(init) && init.length >= 6) {
+                [this.a, this.b, this.c, this.d, this.e, this.f] = init
+            }
+        }
+        multiply(o: any) {
+            return new (globalThis as any).DOMMatrix([
+                this.a * o.a + this.c * o.b, this.b * o.a + this.d * o.b,
+                this.a * o.c + this.c * o.d, this.b * o.c + this.d * o.d,
+                this.a * o.e + this.c * o.f + this.e, this.b * o.e + this.d * o.f + this.f,
+            ])
+        }
+        translate(tx: number, ty: number) { return this.multiply(new (globalThis as any).DOMMatrix([1, 0, 0, 1, tx, ty])) }
+        scale(sx: number, sy?: number) { return this.multiply(new (globalThis as any).DOMMatrix([sx, 0, 0, sy ?? sx, 0, 0])) }
+        inverse() {
+            const det = this.a * this.d - this.b * this.c
+            if (!det) return new (globalThis as any).DOMMatrix()
+            return new (globalThis as any).DOMMatrix([
+                this.d / det, -this.b / det, -this.c / det, this.a / det,
+                (this.c * this.f - this.d * this.e) / det, (this.b * this.e - this.a * this.f) / det,
+            ])
+        }
+        transformPoint(p: any) { return { x: this.a * p.x + this.c * p.y + this.e, y: this.b * p.x + this.d * p.y + this.f, z: 0, w: 1 } }
+        toString() { return `matrix(${this.a},${this.b},${this.c},${this.d},${this.e},${this.f})` }
+    }
+}
+if (typeof (globalThis as any).Path2D === 'undefined') {
+    (globalThis as any).Path2D = class Path2D {
+        constructor(_?: any) {}
+        addPath() {} closePath() {} moveTo() {} lineTo() {}
+        bezierCurveTo() {} quadraticCurveTo() {} arc() {} arcTo() {} ellipse() {} rect() {}
+    }
+}
+
 const openai = new OpenAI()
 
-// pdfjs-dist OPS constants (confirmed via runtime check)
+// pdfjs-dist OPS constants
 const OPS = {
     setFillRGBColor: 59,
     setFillGray: 57,
@@ -23,7 +65,6 @@ const OPS = {
 }
 
 function isGreen(r: number, g: number, b: number): boolean {
-    // HWP 초록: RGB(0, 128, 0) → PDF에서 0, 0.502, 0 근방
     return g > 0.25 && r < 0.45 && b < 0.45
 }
 
@@ -39,51 +80,7 @@ function glyphsToString(glyphs: any[]): string {
 }
 
 async function extractGreenLines(buffer: Buffer): Promise<string[]> {
-    // Dynamic import to avoid Next.js SSR issues with pdfjs-dist
     const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs' as any)
-
-    // pdfjs-dist needs DOMMatrix and Path2D - polyfill for Node.js
-    if (typeof (globalThis as any).DOMMatrix === 'undefined') {
-        (globalThis as any).DOMMatrix = class DOMMatrix {
-            a = 1; b = 0; c = 0; d = 1; e = 0; f = 0
-            get m11() { return this.a } get m12() { return this.b }
-            get m21() { return this.c } get m22() { return this.d }
-            get m41() { return this.e } get m42() { return this.f }
-            is2D = true; isIdentity = true
-
-            constructor(init?: number[] | string) {
-                if (Array.isArray(init) && init.length >= 6) {
-                    [this.a, this.b, this.c, this.d, this.e, this.f] = init
-                }
-            }
-            multiply(o: any) {
-                return new (globalThis as any).DOMMatrix([
-                    this.a * o.a + this.c * o.b, this.b * o.a + this.d * o.b,
-                    this.a * o.c + this.c * o.d, this.b * o.c + this.d * o.d,
-                    this.a * o.e + this.c * o.f + this.e, this.b * o.e + this.d * o.f + this.f,
-                ])
-            }
-            translate(tx: number, ty: number) { return this.multiply(new (globalThis as any).DOMMatrix([1, 0, 0, 1, tx, ty])) }
-            scale(sx: number, sy?: number) { return this.multiply(new (globalThis as any).DOMMatrix([sx, 0, 0, sy ?? sx, 0, 0])) }
-            inverse() {
-                const det = this.a * this.d - this.b * this.c
-                if (!det) return new (globalThis as any).DOMMatrix()
-                return new (globalThis as any).DOMMatrix([
-                    this.d / det, -this.b / det, -this.c / det, this.a / det,
-                    (this.c * this.f - this.d * this.e) / det, (this.b * this.e - this.a * this.f) / det,
-                ])
-            }
-            transformPoint(p: any) { return { x: this.a * p.x + this.c * p.y + this.e, y: this.b * p.x + this.d * p.y + this.f, z: 0, w: 1 } }
-            toString() { return `matrix(${this.a},${this.b},${this.c},${this.d},${this.e},${this.f})` }
-        }
-    }
-    if (typeof (globalThis as any).Path2D === 'undefined') {
-        (globalThis as any).Path2D = class Path2D {
-            constructor(_?: any) {}
-            addPath() {} closePath() {} moveTo() {} lineTo() {}
-            bezierCurveTo() {} quadraticCurveTo() {} arc() {} arcTo() {} ellipse() {} rect() {}
-        }
-    }
 
     const doc = await getDocument({
         data: new Uint8Array(buffer),
@@ -124,7 +121,6 @@ async function extractGreenLines(buffer: Buffer): Promise<string[]> {
                     updateGreen()
                     break
                 case OPS.setFillCMYKColor: {
-                    // CMYK → RGB approximation
                     const [c, m, y, k] = args
                     fillR = (1 - c) * (1 - k)
                     fillG = (1 - m) * (1 - k)
@@ -143,26 +139,18 @@ async function extractGreenLines(buffer: Buffer): Promise<string[]> {
                     flushLine()
                     break
                 case OPS.showText:
-                    if (lineIsGreen && Array.isArray(args[0])) {
-                        lineBuffer += glyphsToString(args[0])
-                    }
+                    if (lineIsGreen && Array.isArray(args[0])) lineBuffer += glyphsToString(args[0])
                     break
                 case OPS.showSpacedText:
-                    if (lineIsGreen && Array.isArray(args[0])) {
-                        lineBuffer += glyphsToString(args[0])
-                    }
+                    if (lineIsGreen && Array.isArray(args[0])) lineBuffer += glyphsToString(args[0])
                     break
                 case OPS.nextLineShowText:
                     flushLine()
-                    if (lineIsGreen && Array.isArray(args[0])) {
-                        lineBuffer = glyphsToString(args[0])
-                    }
+                    if (lineIsGreen && Array.isArray(args[0])) lineBuffer = glyphsToString(args[0])
                     break
                 case OPS.nextLineSetSpacingShowText:
                     flushLine()
-                    if (lineIsGreen && Array.isArray(args[2])) {
-                        lineBuffer = glyphsToString(args[2])
-                    }
+                    if (lineIsGreen && Array.isArray(args[2])) lineBuffer = glyphsToString(args[2])
                     break
             }
         }
@@ -197,7 +185,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         return NextResponse.json({ error: '초록색 텍스트를 찾을 수 없습니다. PDF가 올바르게 내보내졌는지 확인하세요.' }, { status: 400 })
     }
 
-    // GPT로 날짜+내용 구조화
     const response = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [{
