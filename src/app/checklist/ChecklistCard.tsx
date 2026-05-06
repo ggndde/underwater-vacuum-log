@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, Clock, Truck, Building2, ChevronRight, Trash2, Loader2, XCircle, MinusCircle, ArrowRight, Timer, Plus, X, ChevronDown, ChevronUp, FileText, Upload, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Clock, Truck, Building2, ChevronRight, Trash2, Loader2, XCircle, MinusCircle, ArrowRight, Timer, Plus, X, FileText, Upload, RefreshCw } from 'lucide-react'
 import { deleteWorkChecklist, moveToTodayWorkChecklist } from '@/app/actions'
 import { useRouter } from 'next/navigation'
 import { ChecklistPartSelector } from './ChecklistPartSelector'
@@ -274,8 +274,6 @@ function initMachines(item: any): MachineUnit[] {
 }
 
 function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; onSaved: (patch: Record<string, unknown>) => void }) {
-    const hasData = !!(item.machineData || item.machineHours != null || item.machineCycles != null || item.machineErrors || item.machineNotes)
-    const [open, setOpen] = useState(false)
     const [machines, setMachines] = useState<MachineUnit[]>(() => initMachines(item))
     const [saving, setSaving] = useState(false)
 
@@ -296,59 +294,42 @@ function MachineDataPanel({ item, done, onSaved }: { item: any; done: boolean; o
         await fetch('/api/checklist', { method: 'PATCH', body: fd })
         onSaved({ machineData: JSON.stringify(machines) })
         setSaving(false)
-        setOpen(false)
     }
-
-    const summary = machines.map(m => {
-        const parts = [m.hours && `${m.hours}h`, m.cycles && `${m.cycles}c`, m.errors.length && `에러 ${m.errors.length}건`].filter(Boolean).join(' ')
-        return parts ? `${m.unitNo}호기 ${parts}` : ''
-    }).filter(Boolean).join(' | ')
 
     return (
         <div className="px-4 py-3 sm:px-5 sm:py-3.5">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                    <Timer className="w-4 h-4 text-orange-400 flex-shrink-0" />
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200 shrink-0">시간/사이클/에러</span>
-                    {hasData && !open && summary && (
-                        <span className="text-xs text-slate-400 dark:text-slate-500 truncate">{summary}</span>
-                    )}
-                </div>
-                {!done && (
-                    <button onClick={() => setOpen(v => !v)}
-                        className="flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 shrink-0 ml-2">
-                        {open ? <><ChevronUp className="w-3.5 h-3.5" />닫기</> : hasData ? <><ChevronDown className="w-3.5 h-3.5" />수정</> : <>입력</>}
-                    </button>
-                )}
+            <div className="flex items-center gap-2 mb-3">
+                <Timer className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">시간/사이클/에러</span>
             </div>
 
-            {open && (
-                <div className="mt-4 space-y-3">
-                    {machines.map((m, i) => (
-                        <MachineUnitPanel
-                            key={i}
-                            unit={m}
-                            onChange={patch => updateMachine(i, patch)}
-                            onRemove={() => removeMachine(i)}
-                            canRemove={machines.length > 1}
-                            done={done}
-                        />
-                    ))}
+            <div className="space-y-3">
+                {machines.map((m, i) => (
+                    <MachineUnitPanel
+                        key={i}
+                        unit={m}
+                        onChange={patch => updateMachine(i, patch)}
+                        onRemove={() => removeMachine(i)}
+                        canRemove={machines.length > 1}
+                        done={done}
+                    />
+                ))}
 
-                    {!done && (
-                        <button onClick={addMachine}
-                            className="flex items-center justify-center gap-2 w-full py-2.5 border-2 border-dashed border-orange-200 dark:border-orange-800/40 text-orange-400 dark:text-orange-500 hover:border-orange-400 hover:text-orange-500 dark:hover:border-orange-600 rounded-xl text-sm font-bold transition-colors">
-                            <Plus className="w-4 h-4" />호기 추가
-                        </button>
-                    )}
+                {!done && (
+                    <button onClick={addMachine}
+                        className="flex items-center justify-center gap-2 w-full py-2.5 border-2 border-dashed border-orange-200 dark:border-orange-800/40 text-orange-400 dark:text-orange-500 hover:border-orange-400 hover:text-orange-500 dark:hover:border-orange-600 rounded-xl text-sm font-bold transition-colors">
+                        <Plus className="w-4 h-4" />호기 추가
+                    </button>
+                )}
 
+                {!done && (
                     <button onClick={handleSave} disabled={saving}
                         className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                         {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                         {saving ? '저장 중...' : '저장'}
                     </button>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     )
 }
