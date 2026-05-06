@@ -2,13 +2,92 @@
 
 import { useState, useTransition, useRef } from 'react'
 import Link from 'next/link'
-import { CheckCircle2, Clock, Truck, Building2, ChevronRight, Trash2, Loader2, XCircle, MinusCircle, ArrowRight, Timer, Plus, X, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckCircle2, Clock, Truck, Building2, ChevronRight, Trash2, Loader2, XCircle, MinusCircle, ArrowRight, Timer, Plus, X, ChevronDown, ChevronUp, FileText, Upload, RefreshCw } from 'lucide-react'
 import { deleteWorkChecklist, moveToTodayWorkChecklist } from '@/app/actions'
 import { useRouter } from 'next/navigation'
 import { ChecklistPartSelector } from './ChecklistPartSelector'
 import { lookupError } from '@/lib/marinerErrors'
 
 type ErrorEntry = { code: string; count: string }
+type PartHistoryEntry = { date: string; content: string }
+
+function PartHistoryPanel({ item, onSaved }: { item: any; onSaved: (patch: Record<string, unknown>) => void }) {
+    const [history, setHistory] = useState<PartHistoryEntry[]>(() => {
+        try { return item.partHistory ? JSON.parse(item.partHistory) : [] } catch { return [] }
+    })
+    const [analyzing, setAnalyzing] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const fileRef = useRef<HTMLInputElement>(null)
+
+    const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setAnalyzing(true)
+        setError(null)
+        const fd = new FormData()
+        fd.append('file', file)
+        try {
+            const res = await fetch(`/api/checklist/${item.id}/analyze-card`, { method: 'POST', body: fd })
+            const data = await res.json()
+            if (!res.ok) { setError(data.error || '분석 실패') }
+            else { setHistory(data.history); onSaved({ partHistory: JSON.stringify(data.history) }) }
+        } catch { setError('네트워크 오류') }
+        setAnalyzing(false)
+        e.target.value = ''
+    }
+
+    return (
+        <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/40">
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">부품 교체 이력</span>
+                    {history.length > 0 && (
+                        <span className="text-xs text-slate-400 dark:text-slate-500">{history.length}건</span>
+                    )}
+                </div>
+                <button
+                    onClick={() => fileRef.current?.click()}
+                    disabled={analyzing}
+                    className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50 transition-colors"
+                >
+                    {analyzing
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />분석 중...</>
+                        : history.length > 0
+                            ? <><RefreshCw className="w-3.5 h-3.5" />재분석</>
+                            : <><Upload className="w-3.5 h-3.5" />PDF 분석</>
+                    }
+                </button>
+                <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleFile} />
+            </div>
+
+            {error && <p className="text-xs text-red-500 dark:text-red-400 mb-2">{error}</p>}
+
+            {history.length > 0 ? (
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700/40 overflow-hidden">
+                    <table className="w-full text-xs">
+                        <thead>
+                            <tr className="bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-700/40">
+                                <th className="px-3 py-2 text-left font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap w-24">날짜</th>
+                                <th className="px-3 py-2 text-left font-bold text-slate-500 dark:text-slate-400">교체 내용</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700/30">
+                            {history.map((h, i) => (
+                                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-900/20 transition-colors">
+                                    <td className="px-3 py-2 text-slate-500 dark:text-slate-400 font-mono whitespace-nowrap align-top">{h.date}</td>
+                                    <td className="px-3 py-2 text-slate-700 dark:text-slate-200 align-top leading-relaxed">{h.content}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            ) : !analyzing && (
+                <p className="text-xs text-slate-400 dark:text-slate-500">관리카드를 PDF로 내보낸 후 업로드하면 교체 이력을 자동으로 추출합니다.</p>
+            )}
+        </div>
+    )
+}
 
 type MachineUnit = {
     unitNo: number
@@ -633,6 +712,9 @@ export function ChecklistCard({ item: initialItem, parts = [], done: initialDone
 
       {/* 부품 등록 섹션 */}
       <ChecklistPartSelector item={item} parts={parts} />
+
+      {/* 부품 교체 이력 (관리카드 PDF 분석) */}
+      <PartHistoryPanel item={item} onSaved={(patch) => setItem((prev: any) => ({ ...prev, ...patch }))} />
 
     </div>
   )

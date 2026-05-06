@@ -179,6 +179,7 @@ model WorkChecklist {
   machineErrors String? // 레거시
   machineNotes  String? // 레거시
   machineData   String? // JSON: [{unitNo, serialNo, hours, cycles, errors, notes}, ...]
+  partHistory   String? // JSON: [{date, content}] — 관리카드 PDF 교체 이력
 
   completed Boolean  @default(false) // 모든 스텝 완료 여부
   createdBy String   @default("")
