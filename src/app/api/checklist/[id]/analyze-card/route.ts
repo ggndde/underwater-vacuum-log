@@ -73,7 +73,14 @@ let workerSrc: string | null = null
 
 function getWorkerSrc(): string {
     if (!workerSrc) {
-        const workerPath = join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs')
+        // require.resolve finds the actual deployed path (works on Vercel too)
+        // process.cwd()-based path is fallback for environments without require
+        let workerPath: string
+        try {
+            workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.min.mjs')
+        } catch {
+            workerPath = join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs')
+        }
         const data = readFileSync(workerPath).toString('base64')
         workerSrc = `data:text/javascript;base64,${data}`
     }
