@@ -8,6 +8,20 @@ import { join } from 'path'
 
 export const dynamic = 'force-dynamic'
 
+// DOMMatrix polyfill — must run before pdfjs-dist is imported (pdfjs uses it at load time)
+if (typeof (globalThis as any).DOMMatrix === 'undefined') {
+    ;(globalThis as any).DOMMatrix = class DOMMatrix {
+        a=1;b=0;c=0;d=1;e=0;f=0
+        constructor(init?: number[]) { if (Array.isArray(init) && init.length >= 6) [this.a,this.b,this.c,this.d,this.e,this.f] = init }
+        multiply(o: any) { return new (globalThis as any).DOMMatrix([this.a*o.a+this.c*o.b,this.b*o.a+this.d*o.b,this.a*o.c+this.c*o.d,this.b*o.c+this.d*o.d,this.a*o.e+this.c*o.f+this.e,this.b*o.e+this.d*o.f+this.f]) }
+        translate(tx: number, ty: number) { return this.multiply(new (globalThis as any).DOMMatrix([1,0,0,1,tx,ty])) }
+        scale(sx: number, sy?: number) { return this.multiply(new (globalThis as any).DOMMatrix([sx,0,0,sy??sx,0,0])) }
+        transformPoint(p: any) { return { x: this.a*p.x+this.c*p.y+this.e, y: this.b*p.x+this.d*p.y+this.f, z: 0, w: 1 } }
+        inverse() { const det=this.a*this.d-this.b*this.c; if(!det) return new (globalThis as any).DOMMatrix(); return new (globalThis as any).DOMMatrix([this.d/det,-this.b/det,-this.c/det,this.a/det,(this.c*this.f-this.d*this.e)/det,(this.b*this.e-this.a*this.f)/det]) }
+        toString() { return `matrix(${this.a},${this.b},${this.c},${this.d},${this.e},${this.f})` }
+    }
+}
+
 const openai = new OpenAI()
 
 const OPS = {
@@ -25,6 +39,23 @@ const OPS = {
 
 function isGreen(r: number, g: number, b: number): boolean {
     return g > 0.25 && r < 0.45 && b < 0.45
+}
+
+// pdfjs-dist v5 changed color op args from [r,g,b] floats to ["#rrggbb"] hex string
+function parseRGB(args: any[]): [number, number, number] {
+    if (typeof args[0] === 'string' && args[0].startsWith('#')) {
+        const h = args[0].slice(1)
+        return [parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255]
+    }
+    return [args[0] ?? 0, args[1] ?? 0, args[2] ?? 0]
+}
+
+function parseCMYK(args: any[]): [number, number, number] {
+    if (typeof args[0] === 'string' && args[0].startsWith('#')) {
+        return parseRGB(args)
+    }
+    const [c, m, y, k] = [args[0] ?? 0, args[1] ?? 0, args[2] ?? 0, args[3] ?? 0]
+    return [(1 - c) * (1 - k), (1 - m) * (1 - k), (1 - y) * (1 - k)]
 }
 
 function glyphsToString(glyphs: any[]): string {
@@ -85,21 +116,20 @@ async function extractGreenLines(buffer: Buffer): Promise<string[]> {
 
             switch (fn) {
                 case OPS.setFillRGBColor:
-                    fillR = args[0]; fillG = args[1]; fillB = args[2]
+                    flushLine()
+                    ;[fillR, fillG, fillB] = parseRGB(args)
                     updateGreen()
                     break
                 case OPS.setFillGray:
-                    fillR = fillG = fillB = args[0]
+                    flushLine()
+                    fillR = fillG = fillB = typeof args[0] === 'number' ? args[0] : parseFloat(args[0]) || 0
                     updateGreen()
                     break
-                case OPS.setFillCMYKColor: {
-                    const [c, m, y, k] = args
-                    fillR = (1 - c) * (1 - k)
-                    fillG = (1 - m) * (1 - k)
-                    fillB = (1 - y) * (1 - k)
+                case OPS.setFillCMYKColor:
+                    flushLine()
+                    ;[fillR, fillG, fillB] = parseCMYK(args)
                     updateGreen()
                     break
-                }
                 case OPS.beginText:
                     lineBuffer = ''
                     lineIsGreen = isGreen(fillR, fillG, fillB)
