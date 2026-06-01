@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "DATABASE_URL=${DATABASE_URL:-postgresql://localhost/build} prisma generate && if [ -n \"$DATABASE_URL\" ]; then prisma db push --accept-data-loss; fi && next build",
+    "build": "DATABASE_URL=postgresql://localhost/build prisma generate && next build",
     "start": "next start",
     "lint": "next lint"
   },
