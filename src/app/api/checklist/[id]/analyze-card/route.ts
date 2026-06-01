@@ -22,8 +22,6 @@ if (typeof (globalThis as any).DOMMatrix === 'undefined') {
     }
 }
 
-const openai = new OpenAI()
-
 const OPS = {
     setFillRGBColor: 59,
     setFillGray: 57,
@@ -194,6 +192,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         return NextResponse.json({ error: '초록색 텍스트를 찾을 수 없습니다. PDF가 올바르게 내보내졌는지 확인하세요.' }, { status: 400 })
     }
 
+    const openai = new OpenAI()
     const response = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [{
