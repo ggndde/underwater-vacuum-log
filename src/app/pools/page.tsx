@@ -132,7 +132,8 @@ export default function PoolsPage() {
 
     const getG2bSearchUrl = (bidNtceNo: string) => {
         const searchUrl = `https://www.g2b.go.kr:8081/ep/co/pltmMenu/selectIntgSearchView.do?intgSrchTxt=${encodeURIComponent(bidNtceNo)}&intgSrchType=1`;
-        return `https://www.g2b.go.kr/pt/menu/selectSubFrame.do?framesrc=/pt/menu/frameTgong.do?targetUrl=${encodeURIComponent(searchUrl)}`;
+        const framesrc = `/pt/menu/frameTgong.do?targetUrl=${encodeURIComponent(searchUrl)}`;
+        return `https://www.g2b.go.kr/pt/menu/selectSubFrame.do?framesrc=${encodeURIComponent(framesrc)}`;
     };
 
     return (
