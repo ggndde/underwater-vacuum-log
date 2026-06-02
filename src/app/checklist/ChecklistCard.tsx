@@ -530,14 +530,14 @@ export function ChecklistCard({ item: initialItem, parts = [], done: initialDone
 
       {/* 카드 헤더 */}
       <div className="flex items-start justify-between mb-3.5 sm:mb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           {done
             ? <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400 flex-shrink-0" />
             : <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400 flex-shrink-0" />
           }
-          <span className="text-slate-900 dark:text-white font-black text-lg sm:text-xl">{item.companyName}</span>
+          <span className="text-slate-900 dark:text-white font-black text-lg sm:text-xl break-keep leading-tight">{item.companyName}</span>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 ml-2">
+        <div className="flex items-center gap-2 sm:gap-3 ml-2 shrink-0">
           {(!done && isPast) && (
             <button
               onClick={() => {

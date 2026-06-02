@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect, useCallback } from 'react'
+import { useState, useTransition, useEffect, useCallback, useRef } from 'react'
 import { createDelivery, updateDelivery, deleteDelivery } from '@/app/actions'
 import { ChevronLeft, ChevronRight, Plus, X, Pencil, Trash2, Package, MapPin, User, CalendarDays, CheckCircle2, Clock, XCircle, List } from 'lucide-react'
 
@@ -307,6 +307,7 @@ export function DeliveryCalendar({ employees }: { employees: string[] }) {
     const [loading, setLoading] = useState(false)
 
     const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+    const detailPanelRef = useRef<HTMLDivElement>(null)
     const [modalOpen, setModalOpen] = useState(false)
     const [editTarget, setEditTarget] = useState<Delivery | null>(null)
     const [defaultDate, setDefaultDate] = useState<string | undefined>()
@@ -329,6 +330,15 @@ export function DeliveryCalendar({ employees }: { employees: string[] }) {
     useEffect(() => {
         fetchDeliveries()
     }, [fetchDeliveries])
+
+    useEffect(() => {
+        if (selectedDate && detailPanelRef.current && typeof window !== 'undefined') {
+            if (window.innerWidth < 1024) {
+                const y = detailPanelRef.current.getBoundingClientRect().top + window.scrollY - 72
+                window.scrollTo({ top: y, behavior: 'smooth' })
+            }
+        }
+    }, [selectedDate])
 
     // Refresh after actions
     const handleModalClose = () => {
@@ -583,7 +593,7 @@ export function DeliveryCalendar({ employees }: { employees: string[] }) {
                 </div>
 
                 {/* Right panel */}
-                <div>
+                <div ref={detailPanelRef}>
                     {selectedDate ? (
                         <DetailPanel
                             date={selectedDate}

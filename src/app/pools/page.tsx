@@ -135,7 +135,7 @@ export default function PoolsPage() {
             <header className="mb-8">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold mb-2 text-slate-900 dark:text-white">준공예정 관공서 및 수영장</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-slate-900 dark:text-white">준공예정 관공서 및 수영장</h1>
                         <p className="text-slate-500 dark:text-slate-400 flex items-center gap-2">
                             <span className="inline-block w-2 h-2 rounded-full bg-violet-500"></span>
                             조달청 시설공사 실시간 연동 (수영장 및 체육센터 건립)
@@ -148,23 +148,29 @@ export default function PoolsPage() {
                     )}
                 </div>
 
-                <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-center gap-4">
-                    <div className="flex items-center gap-2 flex-1 w-full">
-                        <Calendar className="w-5 h-5 text-slate-400 dark:text-slate-500" />
-                        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 px-3 py-2 rounded-lg flex-1">
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="bg-transparent text-sm outline-none w-full cursor-pointer text-slate-900 dark:text-white dark:[color-scheme:dark]"
-                            />
-                            <span className="text-slate-400">~</span>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                className="bg-transparent text-sm outline-none w-full cursor-pointer text-slate-900 dark:text-white dark:[color-scheme:dark]"
-                            />
+                <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row md:items-center gap-3">
+                    <div className="flex items-start gap-2 flex-1 w-full">
+                        <Calendar className="w-5 h-5 text-slate-400 dark:text-slate-500 shrink-0 mt-2.5" />
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-1">
+                            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 px-3 py-2 rounded-lg flex-1">
+                                <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">시작</span>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="bg-transparent text-sm outline-none w-full cursor-pointer min-w-0 text-slate-900 dark:text-white dark:[color-scheme:dark]"
+                                />
+                            </div>
+                            <span className="text-slate-400 text-sm hidden sm:block shrink-0">~</span>
+                            <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 px-3 py-2 rounded-lg flex-1">
+                                <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">종료</span>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="bg-transparent text-sm outline-none w-full cursor-pointer min-w-0 text-slate-900 dark:text-white dark:[color-scheme:dark]"
+                                />
+                            </div>
                         </div>
                     </div>
                     <button
@@ -268,8 +274,8 @@ export default function PoolsPage() {
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center justify-between md:col-span-2 pt-2 mt-2 border-t border-slate-200/60 dark:border-slate-700/60">
-                                                    <span className="text-slate-400 dark:text-slate-500 flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5" /> 배정예산(추정가격)</span>
-                                                    <span className="font-bold text-lg text-slate-900 dark:text-white">
+                                                    <span className="text-slate-400 dark:text-slate-500 flex items-center gap-1.5 shrink-0"><DollarSign className="w-3.5 h-3.5" /> <span className="hidden sm:inline">배정예산(추정가격)</span><span className="sm:hidden">추정가격</span></span>
+                                                    <span className="font-bold text-base sm:text-lg text-slate-900 dark:text-white shrink-0">
                                                         {formatCurrency(bid.presmptPrce)}
                                                     </span>
                                                 </div>
