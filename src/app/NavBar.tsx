@@ -19,49 +19,59 @@ export function NavBar({ userName }: { userName: string }) {
     const [mounted, setMounted] = useState(false)
     const pathname = usePathname()
     const [hasNewBids, setHasNewBids] = useState(false)
+    const [hasNewPools, setHasNewPools] = useState(false)
 
     useEffect(() => {
         setMounted(true)
     }, [])
 
     useEffect(() => {
-        const checkNewBids = async () => {
-            const today = new Date()
-            const dateStr = today.toISOString().split('T')[0].replace(/-/g, '')
-            
-            if (pathname === '/bids') {
-                localStorage.setItem('bidsViewed', dateStr)
-                setHasNewBids(false)
+        const checkNotifications = async () => {
+            // Dismiss notifications when user visits the relevant page
+            if (pathname === '/bids' || pathname === '/pools') {
+                if (pathname === '/bids') setHasNewBids(false)
+                if (pathname === '/pools') setHasNewPools(false)
+
+                // Mark as seen in localStorage (keyed by notification date from cache)
+                const cachedBidsDate = sessionStorage.getItem('notif_bidsDate')
+                const cachedPoolsDate = sessionStorage.getItem('notif_poolsDate')
+                if (pathname === '/bids' && cachedBidsDate) {
+                    localStorage.setItem('bidsNotifSeen', cachedBidsDate)
+                }
+                if (pathname === '/pools' && cachedPoolsDate) {
+                    localStorage.setItem('poolsNotifSeen', cachedPoolsDate)
+                }
                 return
             }
 
-            if (localStorage.getItem('bidsViewed') === dateStr) {
-                setHasNewBids(false)
-                return
-            }
-
-            const cachedTime = sessionStorage.getItem('bidsCheckTime')
-            const cachedDate = sessionStorage.getItem('bidsCheckDate')
+            // Use sessionStorage to avoid repeated API calls (30-min cache)
+            const cachedTime = sessionStorage.getItem('notifCheckTime')
             const now = Date.now()
-
-            if (cachedDate === dateStr && cachedTime && now - parseInt(cachedTime) < 30 * 60 * 1000) {
-                setHasNewBids(sessionStorage.getItem('bidsNew') === 'true')
+            if (cachedTime && now - parseInt(cachedTime) < 30 * 60 * 1000) {
+                const bidsDate = sessionStorage.getItem('notif_bidsDate')
+                const poolsDate = sessionStorage.getItem('notif_poolsDate')
+                const hasBids = sessionStorage.getItem('notif_hasBids') === 'true'
+                const hasPools = sessionStorage.getItem('notif_hasPools') === 'true'
+                setHasNewBids(hasBids && localStorage.getItem('bidsNotifSeen') !== bidsDate)
+                setHasNewPools(hasPools && localStorage.getItem('poolsNotifSeen') !== poolsDate)
                 return
             }
 
             try {
-                const res = await fetch(`/api/bids?startDate=${dateStr}0000&endDate=${dateStr}2359`)
+                const res = await fetch('/api/notifications')
                 if (res.ok) {
                     const data = await res.json()
-                    const isNew = data.items?.length > 0
-                    setHasNewBids(isNew)
-                    sessionStorage.setItem('bidsCheckTime', now.toString())
-                    sessionStorage.setItem('bidsCheckDate', dateStr)
-                    sessionStorage.setItem('bidsNew', isNew ? 'true' : 'false')
+                    sessionStorage.setItem('notifCheckTime', now.toString())
+                    sessionStorage.setItem('notif_hasBids', data.hasBids ? 'true' : 'false')
+                    sessionStorage.setItem('notif_hasPools', data.hasPools ? 'true' : 'false')
+                    sessionStorage.setItem('notif_bidsDate', data.bidsDate ?? '')
+                    sessionStorage.setItem('notif_poolsDate', data.poolsDate ?? '')
+                    setHasNewBids(data.hasBids && localStorage.getItem('bidsNotifSeen') !== data.bidsDate)
+                    setHasNewPools(data.hasPools && localStorage.getItem('poolsNotifSeen') !== data.poolsDate)
                 }
             } catch (e) {}
         }
-        checkNewBids()
+        checkNotifications()
     }, [pathname])
 
     const activePin = step === 'current' ? currentPin : newPin
@@ -131,8 +141,14 @@ export function NavBar({ userName }: { userName: string }) {
                                     </span>
                                 )}
                             </Link>
-                            <Link href="/pools" className={`text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${isPath('/pools') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
+                            <Link href="/pools" className={`relative text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${isPath('/pools') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
                                 <span className="mr-0.5">🏗️</span><span className="inline">준공예정</span>
+                                {hasNewPools && (
+                                    <span className="absolute -top-1 -right-2 flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                    </span>
+                                )}
                             </Link>
                             <Link href="/delivery" className={`text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${isPath('/delivery') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'}`}>
                                 <span className="mr-0.5">🚚</span><span className="inline">납품 캘린더</span>
@@ -193,9 +209,15 @@ export function NavBar({ userName }: { userName: string }) {
                             </span>
                         )}
                     </Link>
-                    <Link href="/pools" className={`flex flex-col items-center justify-center w-full h-full transition-colors ${isPath('/pools') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
+                    <Link href="/pools" className={`relative flex flex-col items-center justify-center w-full h-full transition-colors ${isPath('/pools') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
                         <span className={`text-[20px] mb-[2px] ${isPath('/pools') ? '' : 'opacity-80 grayscale-[20%]'}`}>🏗️</span>
                         <span className="text-[10px] font-bold">준공예정</span>
+                        {hasNewPools && (
+                            <span className="absolute top-[6px] right-4 flex h-[6px] w-[6px]">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full bg-red-500 h-[6px] w-[6px]"></span>
+                            </span>
+                        )}
                     </Link>
                     <Link href="/delivery" className={`flex flex-col items-center justify-center w-full h-full transition-colors ${isPath('/delivery') ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
                         <span className={`text-[20px] mb-[2px] ${isPath('/delivery') ? '' : 'opacity-80 grayscale-[20%]'}`}>🚚</span>

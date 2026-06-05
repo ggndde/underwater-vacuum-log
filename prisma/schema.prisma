@@ -241,3 +241,11 @@ model PartCatalog {
   description String
   createdAt   DateTime @default(now())
 }
+
+// ─── App Cache (key-value store for cron results, notifications, etc.) ────────
+
+model AppCache {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
