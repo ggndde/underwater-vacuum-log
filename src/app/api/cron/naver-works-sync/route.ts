@@ -3,6 +3,12 @@ import { NextResponse } from 'next/server'
 import { fetchBoards, fetchPosts, fetchComments, fetchPostDetail } from '@/lib/naverWorks'
 import { parseComment } from '@/lib/parseNaverWorks'
 
+// 이 키워드 중 하나라도 포함된 댓글/게시글만 납품 캘린더에 연동
+const DELIVERY_KEYWORDS = ['납품', '협의', '방문']
+
+const hasDeliveryKeyword = (text: string) =>
+  DELIVERY_KEYWORDS.some(kw => text.includes(kw))
+
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -128,7 +134,7 @@ export async function GET(req: Request) {
                 const postDetail = await fetchPostDetail(board.boardId, postId)
                 const postBody = (postDetail.content || '').replace(/<[^>]*>/g, ' ').trim()
 
-                if (postBody) {
+                if (postBody && hasDeliveryKeyword(postBody)) {
                   // Use delivery.externalId to guard against double-processing
                   const existingDelivery = await prisma.delivery.findUnique({
                     where: { externalId: `post_${postId}` },
@@ -141,7 +147,7 @@ export async function GET(req: Request) {
                       postDetail.createdTime || new Date().toISOString()
                     )
 
-                    if (parsed && parsed.customerName && parsed.isDelivery) {
+                    if (parsed && parsed.customerName) {
                       // Store externalId so we never create a duplicate for this post
                       const pendingDelivery = await prisma.delivery.findFirst({
                         where: { destination: { contains: parsed.customerName }, status: '예정' },
@@ -217,6 +223,9 @@ export async function GET(req: Request) {
 
                   if (!commentText.trim()) continue
 
+                  // 키워드 없는 댓글은 납품과 무관 → 스킵
+                  if (!hasDeliveryKeyword(commentText)) continue
+
                   // Guard: skip comments already turned into a Delivery record
                   const existingDelivery = await prisma.delivery.findUnique({
                     where: { externalId: `comment_${commentId}` },
@@ -229,7 +238,7 @@ export async function GET(req: Request) {
                     comment.createdTime || new Date().toISOString()
                   )
 
-                  if (parsed && parsed.customerName && parsed.isDelivery) {
+                  if (parsed && parsed.customerName) {
                     await upsertDelivery(parsed, comment.createdTime || new Date().toISOString(), '자동연동(댓글)', `comment_${commentId}`)
                   }
                 } // end comments loop
