@@ -77,6 +77,20 @@ export async function fetchPosts(boardId: string, cursor?: string) {
   return JSON.parse(text.replace(/([:\[,]\s*)([0-9]{15,})\b/g, '$1"$2"'));
 }
 
+export async function fetchPostDetail(boardId: string, postId: string) {
+  const token = await getNaverWorksAccessToken();
+  const res = await fetch(`https://www.worksapis.com/v1.0/boards/${boardId}/posts/${postId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('Failed to fetch post detail:', text);
+    throw new Error('Failed to fetch post detail');
+  }
+  const text = await res.text();
+  return JSON.parse(text.replace(/([:\[,]\s*)([0-9]{15,})\b/g, '$1"$2"'));
+}
+
 export async function fetchComments(boardId: string, postId: string) {
   const token = await getNaverWorksAccessToken();
   const res = await fetch(`https://www.worksapis.com/v1.0/boards/${boardId}/posts/${postId}/comments`, {

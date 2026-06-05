@@ -1,137 +1,218 @@
-﻿import { prisma } from '@/lib/prisma'
-import { NextResponse } from 'next/server';
-;
-import { fetchBoards, fetchPosts, fetchComments } from '@/lib/naverWorks';
-import { parseComment } from '@/lib/parseNaverWorks';
-;
+import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server'
+import { fetchBoards, fetchPosts, fetchComments, fetchPostDetail } from '@/lib/naverWorks'
+import { parseComment } from '@/lib/parseNaverWorks'
 
 export async function GET(req: Request) {
-  const authHeader = req.headers.get('authorization');
+  const authHeader = req.headers.get('authorization')
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new NextResponse('Unauthorized', { status: 401 });
+    return new NextResponse('Unauthorized', { status: 401 })
   }
 
   try {
-    let syncedDeliveries = 0;
-    let updatedDeliveries = 0;
-    let processedPostsCount = 0;
-    
+    let syncedDeliveries = 0
+    let updatedDeliveries = 0
+    let processedPostsCount = 0
+
     // Load all current comment counts from DB for fast in-memory lookup
-    const allMeta = await prisma.naverWorksMeta.findMany();
-    const metaMap = new Map<string, number>();
+    const allMeta = await prisma.naverWorksMeta.findMany()
+    const metaMap = new Map<string, number>()
     for (const m of allMeta) {
-      metaMap.set(m.postId, m.commentCount);
+      metaMap.set(m.postId, m.commentCount)
     }
-    
+
+    // Shared: create or update Delivery from a parsed result
+    const upsertDelivery = async (
+      parsed: { customerName: string; content: string; isDelivery: boolean; deliveryDate: string; productName: string },
+      createdTime: string,
+      performedBy: string
+    ) => {
+      const pendingDelivery = await prisma.delivery.findFirst({
+        where: { destination: { contains: parsed.customerName }, status: '예정' },
+      })
+
+      let targetDate = new Date(createdTime || Date.now())
+      if (parsed.deliveryDate) {
+        const d = new Date(parsed.deliveryDate)
+        if (!isNaN(d.getTime())) targetDate = d
+      }
+
+      if (pendingDelivery) {
+        await prisma.delivery.update({
+          where: { id: pendingDelivery.id },
+          data: {
+            date: targetDate,
+            memo: pendingDelivery.memo ? `${pendingDelivery.memo}\n[추가] ${parsed.content}` : parsed.content,
+          },
+        })
+        updatedDeliveries++
+      } else {
+        await prisma.delivery.create({
+          data: {
+            date: targetDate,
+            productName: parsed.productName || '수중청소기',
+            destination: parsed.customerName,
+            memo: parsed.content,
+            quantity: 1,
+            performedBy,
+            status: '예정',
+            source: 'naver_works',
+          },
+        })
+        syncedDeliveries++
+      }
+    }
+
     // 1. Fetch Boards
-    console.log('Fetching boards from Naver Works...');
-    let boardsResult;
+    console.log('Fetching boards from Naver Works...')
+    let boardsResult
     try {
-      boardsResult = await fetchBoards();
-    } catch(err) {
-      console.warn("Could not fetch boards. Check scope or credentials.", err);
+      boardsResult = await fetchBoards()
+    } catch (err) {
+      console.warn('Could not fetch boards. Check scope or credentials.', err)
     }
-    
+
     if (boardsResult && boardsResult.boards) {
       for (const board of boardsResult.boards) {
-        if (!board.boardName.includes('신규구매 의뢰')) continue;
+        if (!board.boardName.includes('신규구매 의뢰')) continue
 
-        let cursor: string | undefined = undefined;
-        let hasMore = true;
-        let pageCount = 0;
+        let cursor: string | undefined = undefined
+        let hasMore = true
 
         // Scan all pages — old posts can receive new comments at any time
         while (hasMore) {
-          pageCount++;
-          let postsResult;
+          let postsResult
           try {
-            postsResult = await fetchPosts(board.boardId, cursor);
-          } catch(err) {
-            hasMore = false;
-            break;
+            postsResult = await fetchPosts(board.boardId, cursor)
+          } catch (err) {
+            hasMore = false
+            break
           }
 
           if (!postsResult || !postsResult.posts || postsResult.posts.length === 0) {
-            hasMore = false;
-            break;
+            hasMore = false
+            break
           }
 
           for (const post of postsResult.posts) {
-            processedPostsCount++;
-            const postId = post.postId;
-            const currentCommentCount = post.commentCount || 0;
-            const storedCommentCount = metaMap.get(postId) || 0;
+            processedPostsCount++
+            const postId = post.postId
+            const currentCommentCount = post.commentCount || 0
+            // undefined = this post has never been seen by the sync before
+            const storedCommentCount = metaMap.get(postId)
+            const isNewPost = storedCommentCount === undefined
+            const storedCount = storedCommentCount ?? 0
 
-            // ONLY fetch comments if the count has INCREASED
-            if (currentCommentCount > storedCommentCount) {
-              
-              let commentsResult;
+            // ── NEW POST: process the post body itself ──────────────────────
+            // Posts with no replies (commentCount = 0) are otherwise never read.
+            // e.g. "납기일변경 7/30" posted as a standalone 글 without 답글 yet.
+            if (isNewPost) {
               try {
-                commentsResult = await fetchComments(board.boardId, postId);
-              } catch(err) {
-                continue;
+                const postDetail = await fetchPostDetail(board.boardId, postId)
+                const postBody = (postDetail.content || '').replace(/<[^>]*>/g, ' ').trim()
+
+                if (postBody) {
+                  // Use delivery.externalId to guard against double-processing
+                  const existingDelivery = await prisma.delivery.findUnique({
+                    where: { externalId: `post_${postId}` },
+                  })
+
+                  if (!existingDelivery) {
+                    const parsed = await parseComment(
+                      post.title || '',
+                      postBody,
+                      postDetail.createdTime || new Date().toISOString()
+                    )
+
+                    if (parsed && parsed.customerName && parsed.isDelivery) {
+                      // Store externalId so we never create a duplicate for this post
+                      const pendingDelivery = await prisma.delivery.findFirst({
+                        where: { destination: { contains: parsed.customerName }, status: '예정' },
+                      })
+
+                      let targetDate = new Date(postDetail.createdTime || Date.now())
+                      if (parsed.deliveryDate) {
+                        const d = new Date(parsed.deliveryDate)
+                        if (!isNaN(d.getTime())) targetDate = d
+                      }
+
+                      if (pendingDelivery) {
+                        await prisma.delivery.update({
+                          where: { id: pendingDelivery.id },
+                          data: {
+                            date: targetDate,
+                            memo: pendingDelivery.memo
+                              ? `${pendingDelivery.memo}\n[추가] ${parsed.content}`
+                              : parsed.content,
+                            externalId: `post_${postId}`,
+                          },
+                        })
+                        updatedDeliveries++
+                      } else {
+                        await prisma.delivery.create({
+                          data: {
+                            date: targetDate,
+                            productName: parsed.productName || '수중청소기',
+                            destination: parsed.customerName,
+                            memo: parsed.content,
+                            quantity: 1,
+                            performedBy: '자동연동(게시글)',
+                            status: '예정',
+                            source: 'naver_works',
+                            externalId: `post_${postId}`,
+                          },
+                        })
+                        syncedDeliveries++
+                      }
+                    }
+                  }
+                }
+              } catch (err) {
+                console.warn(`Could not process post body for ${postId}:`, err)
+              }
+
+              // Always register new posts in meta so they aren't re-fetched every run
+              await prisma.naverWorksMeta.upsert({
+                where: { postId },
+                update: { commentCount: currentCommentCount },
+                create: { postId, commentCount: currentCommentCount },
+              })
+              metaMap.set(postId, currentCommentCount)
+            }
+
+            // ── COMMENTS: only when count increased since last sync ─────────
+            if (currentCommentCount > storedCount) {
+              let commentsResult
+              try {
+                commentsResult = await fetchComments(board.boardId, postId)
+              } catch (err) {
+                continue
               }
 
               if (commentsResult && commentsResult.comments) {
-                // 부모 게시글부터 오래된 댓글(과거) -> 최신 댓글 순서로 시간순 정렬하여 히스토리 꼬임 및 날짜 덮어쓰기 방지
-                const sortedComments = [...commentsResult.comments].sort((a, b) => new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime());
+                // Sort oldest → newest to process in chronological order
+                const sortedComments = [...commentsResult.comments].sort(
+                  (a, b) => new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime()
+                )
                 for (const comment of sortedComments) {
-                  const commentId = comment.commentId;
-                  const commentText = comment.content || '';
-                  
-                  if (!commentText.trim()) continue;
+                  const commentId = comment.commentId
+                  const commentText = comment.content || ''
 
-                  // Check if we already processed this specific comment
+                  if (!commentText.trim()) continue
+
                   const existingLog = await prisma.serviceLog.findUnique({
                     where: { externalId: commentId },
-                  });
-                  
-                  if (existingLog) continue;
+                  })
+                  if (existingLog) continue
 
-                  // Parse comment with AI
-                  const parsed = await parseComment(post.title || '', commentText, comment.createdTime || new Date().toISOString());
+                  const parsed = await parseComment(
+                    post.title || '',
+                    commentText,
+                    comment.createdTime || new Date().toISOString()
+                  )
 
                   if (parsed && parsed.customerName && parsed.isDelivery) {
-                    // 납품 일정 자동 생성
-                    const pendingDelivery = await prisma.delivery.findFirst({
-                      where: {
-                        destination: { contains: parsed.customerName },
-                        status: '예정'
-                      }
-                    });
-
-                    let targetDate = new Date(comment.createdTime || Date.now());
-                    if (parsed.deliveryDate) {
-                      const parsedDate = new Date(parsed.deliveryDate);
-                      if (!isNaN(parsedDate.getTime())) {
-                        targetDate = parsedDate;
-                      }
-                    }
-
-                    if (pendingDelivery) {
-                      await prisma.delivery.update({
-                        where: { id: pendingDelivery.id },
-                        data: {
-                          date: targetDate,
-                          memo: pendingDelivery.memo ? `${pendingDelivery.memo}\n[추가] ${parsed.content}` : parsed.content
-                        }
-                      });
-                      updatedDeliveries++;
-                    } else {
-                      await prisma.delivery.create({
-                        data: {
-                          date: targetDate,
-                          productName: parsed.productName || '수중청소기',
-                          destination: parsed.customerName,
-                          memo: parsed.content,
-                          quantity: 1,
-                          performedBy: '자동연동(댓글)',
-                          status: '예정',
-                          source: 'naver_works'
-                        }
-                      });
-                      syncedDeliveries++;
-                    }
+                    await upsertDelivery(parsed, comment.createdTime || new Date().toISOString(), '자동연동(댓글)')
                   }
                 } // end comments loop
               }
@@ -140,17 +221,14 @@ export async function GET(req: Request) {
               await prisma.naverWorksMeta.upsert({
                 where: { postId },
                 update: { commentCount: currentCommentCount },
-                create: { postId, commentCount: currentCommentCount }
-              });
-              // Update our in-memory map just in case we process the same post in the same run (unlikely but safe)
-              metaMap.set(postId, currentCommentCount);
+                create: { postId, commentCount: currentCommentCount },
+              })
+              metaMap.set(postId, currentCommentCount)
             }
           } // end posts loop
-          
-          cursor = postsResult.responseMetaData?.nextCursor;
-          if (!cursor) {
-            hasMore = false; // No more pages
-          }
+
+          cursor = postsResult.responseMetaData?.nextCursor
+          if (!cursor) hasMore = false
         } // end while pages loop
       } // end boards loop
     }
@@ -160,11 +238,10 @@ export async function GET(req: Request) {
       message: 'Sync completed',
       processedPostsCount,
       syncedDeliveries,
-      updatedDeliveries
-    });
-
+      updatedDeliveries,
+    })
   } catch (error: any) {
-    console.error('Naver Works sync error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('Naver Works sync error:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
