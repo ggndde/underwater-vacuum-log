@@ -25,11 +25,25 @@ export async function GET(req: Request) {
     const upsertDelivery = async (
       parsed: { customerName: string; content: string; isDelivery: boolean; deliveryDate: string; productName: string },
       createdTime: string,
-      performedBy: string
+      performedBy: string,
+      externalId?: string
     ) => {
-      const pendingDelivery = await prisma.delivery.findFirst({
+      // Prefer an '예정' delivery, fall back to any recent delivery for the same destination
+      // (handles the case where the delivery was already marked '완료' but a date change arrives)
+      let existingDelivery = await prisma.delivery.findFirst({
         where: { destination: { contains: parsed.customerName }, status: '예정' },
+        orderBy: { createdAt: 'desc' },
       })
+      if (!existingDelivery) {
+        existingDelivery = await prisma.delivery.findFirst({
+          where: {
+            destination: { contains: parsed.customerName },
+            source: 'naver_works',
+            createdAt: { gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      }
 
       let targetDate = new Date(createdTime || Date.now())
       if (parsed.deliveryDate) {
@@ -37,12 +51,14 @@ export async function GET(req: Request) {
         if (!isNaN(d.getTime())) targetDate = d
       }
 
-      if (pendingDelivery) {
+      if (existingDelivery) {
         await prisma.delivery.update({
-          where: { id: pendingDelivery.id },
+          where: { id: existingDelivery.id },
           data: {
             date: targetDate,
-            memo: pendingDelivery.memo ? `${pendingDelivery.memo}\n[추가] ${parsed.content}` : parsed.content,
+            status: '예정',
+            memo: existingDelivery.memo ? `${existingDelivery.memo}\n[추가] ${parsed.content}` : parsed.content,
+            ...(externalId ? { externalId } : {}),
           },
         })
         updatedDeliveries++
@@ -57,6 +73,7 @@ export async function GET(req: Request) {
             performedBy,
             status: '예정',
             source: 'naver_works',
+            ...(externalId ? { externalId } : {}),
           },
         })
         syncedDeliveries++
@@ -200,10 +217,11 @@ export async function GET(req: Request) {
 
                   if (!commentText.trim()) continue
 
-                  const existingLog = await prisma.serviceLog.findUnique({
-                    where: { externalId: commentId },
+                  // Guard: skip comments already turned into a Delivery record
+                  const existingDelivery = await prisma.delivery.findUnique({
+                    where: { externalId: `comment_${commentId}` },
                   })
-                  if (existingLog) continue
+                  if (existingDelivery) continue
 
                   const parsed = await parseComment(
                     post.title || '',
@@ -212,7 +230,7 @@ export async function GET(req: Request) {
                   )
 
                   if (parsed && parsed.customerName && parsed.isDelivery) {
-                    await upsertDelivery(parsed, comment.createdTime || new Date().toISOString(), '자동연동(댓글)')
+                    await upsertDelivery(parsed, comment.createdTime || new Date().toISOString(), '자동연동(댓글)', `comment_${commentId}`)
                   }
                 } // end comments loop
               }
