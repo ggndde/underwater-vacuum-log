@@ -384,7 +384,7 @@ export function DiagramsClient({ initial, isMaster = false }: { initial: Diagram
 
     return (
         <>
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-5 gap-3">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
                         <BookOpen className="w-6 h-6 text-blue-600" />
@@ -392,7 +392,7 @@ export function DiagramsClient({ initial, isMaster = false }: { initial: Diagram
                     </h1>
                     <p className="text-sm text-slate-500 mt-1">도면을 클릭하면 확대해서 볼 수 있습니다</p>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap justify-end">
+                <div className="flex items-center gap-2 flex-wrap">
                     <Link
                         href="/diagrams/parts"
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 text-sm font-bold hover:bg-violet-200 dark:hover:bg-violet-900/50 transition-colors"

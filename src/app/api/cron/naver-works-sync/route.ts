@@ -39,9 +39,9 @@ export async function GET(req: Request) {
         let cursor: string | undefined = undefined;
         let hasMore = true;
         let pageCount = 0;
-        
-        // Loop through pages (limit to 10 pages max to prevent infinite loops/timeouts)
-        while (hasMore && pageCount < 10) {
+
+        // Scan all pages — old posts can receive new comments at any time
+        while (hasMore) {
           pageCount++;
           let postsResult;
           try {
