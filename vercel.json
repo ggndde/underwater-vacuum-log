@@ -16,6 +16,9 @@
     },
     "src/app/api/cron/bids-daily/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/admin/naver-works-full-sync/route.ts": {
+      "maxDuration": 300
     }
   }
 }
