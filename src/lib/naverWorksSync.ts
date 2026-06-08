@@ -2,10 +2,11 @@ import { prisma } from '@/lib/prisma'
 import { fetchBoards, fetchPosts, fetchComments, fetchPostDetail } from '@/lib/naverWorks'
 import { parseComment } from '@/lib/parseNaverWorks'
 
-const DELIVERY_KEYWORDS = ['납품', '협의', '방문']
+const DELIVERY_KEYWORDS = ['납품', '협의']
+const DATE_PATTERN = /\d{1,2}\/\d{1,2}/
 
 export const hasDeliveryKeyword = (text: string) =>
-  DELIVERY_KEYWORDS.some(kw => text.includes(kw))
+  DATE_PATTERN.test(text) && DELIVERY_KEYWORDS.some(kw => text.includes(kw))
 
 type ParsedComment = {
   customerName: string
