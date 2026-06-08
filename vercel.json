@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron/naver-works-sync",
-      "schedule": "0 15 * * *"
+      "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/bids-daily",
